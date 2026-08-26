@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sivraj OS v1.0</title>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #58a6ff;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .terminal {
+            width: 100%;
+            max-width: 800px;
+            height: 80vh;
+            background-color: #161b22;
+            border: 2px solid #30363d;
+            border-radius: 6px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .terminal-header {
+            background-color: #21262d;
+            padding: 10px;
+            color: #c9d1d9;
+            border-bottom: 2px solid #30363d;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .terminal-body {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        .output-line {
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+        .user-line {
+            color: #7ee787;
+        }
+        .sivraj-line {
+            color: #ff7b72;
+        }
+        .system-line {
+            color: #f2cc60;
+        }
+        .input-area {
+            display: flex;
+            padding: 10px;
+            background-color: #0d1117;
+            border-top: 2px solid #30363d;
+        }
+        .prompt {
+            color: #7ee787;
+            margin-right: 5px;
+        }
+        input[type="text"] {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #c9d1d9;
+            font-family: inherit;
+            font-size: 16px;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="terminal">
+    <div class="terminal-header">
+        <span>SIVRAJ OS v1.0 - O PRIMO DE TI DO JARVIS</span>
+        <span>STATUS: ONLINE (EXCEL READY)</span>
+    </div>
+    <div class="terminal-body" id="terminalBody">
+        <div class="output-line system-line">============================================================</div>
+        <div class="output-line system-line">        SIVRAJ OS v1.0 - O PRIMO DE TI DO JARVIS</div>
+        <div class="output-line system-line">============================================================</div>
+        <div class="output-line sivraj-line">Sivraj: "Namastê, chefe. Inicializando sistemas básicos..."</div>
+        <div class="output-line sivraj-line">Sivraj: "Pronto. Não temos hologramas 3D, mas meu Excel está afiadíssimo."</div>
+        <div class="output-line sivraj-line">Sivraj: "O que o senhor deseja? (Digite algo como 'sistema lento', 'combate' ou 'clima')"</div>
+    </div>
+    <div class="input-area">
+        <span class="prompt">Você:></span>
+        <input type="text" id="userInput" autofocus autocomplete="off">
+    </div>
+</div>
+
+<script>
+    const terminalBody = document.getElementById('terminalBody');
+    const userInput = document.getElementById('userInput');
+
+    const respostasSistema = [
+        "Compreendo perfeitamente, chefe. Por gentileza, o senhor já tentou desligar e ligar novamente?",
+        "Estou otimizando sua memória RAM usando uma técnica milenar de meditação de servidores. Por favor, aguarde.",
+        "O sistema está lento porque o senhor tem 47 abas do Chrome abertas. Nem o Jarvis resolveria isso sem chorar."
+    ];
+
+    const respostasCombate = [
+        "Modo de combate ativado! Estou enviando um e-mail de reclamação fortemente redigido para os seus inimigos. Copiei o setor jurídico deles.",
+        "Iniciando protocolo de defesa: Bloqueando o Wi-Fi de quem estiver te irritando.",
+        "Alerta! Inimigos detectados. Deseja que eu envie uma enxurrada de spans de telemarketing para o celular deles?"
+    ];
+
+    const respostasClima = [
+        "Hoje fará um calor terrível. Recomendo fortemente que o senhor não use armadura de metal hoje, a menos que queira virar um frango tandoori.",
+        "Previsão de chuva. Se o senhor for voar, por favor, leve um guarda-chuva de titânio.",
+        "O clima está ótimo para ficar em casa programando e tomando um bom chá Chai."
+    ];
+
+    const respostasPadrao = [
+        "Hum... processando. Seu pedido faz sentido, mas o orçamento atual do nosso servidor não cobre essa função.",
+        "Anotado, chefe. Vou colocar essa tarefa na minha planilha do Excel extremamente otimizada.",
+        "Interessante... Mas o senhor já pagou a conta de luz este mês? Minha assinatura depende disso."
+    ];
+
+    userInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            const command = userInput.value.trim();
+            if (command === '') return;
+
+            // Mostrar comando do usuário
+            appendLine('Você:> ' + command, 'user-line');
+            userInput.value = '';
+
+            // Simular delay do Sivraj
+            appendLine('Sivraj: . . .', 'sivraj-line temp-loading');
+            
+            setTimeout(() => {
+                // Remover indicador de carregamento
+                const loading = document.querySelector('.temp-loading');
+                if (loading) loading.remove();
+
+                const cmdLower = command.toLowerCase();
+                let resposta = "";
+
+                if (cmdLower.includes('lento') || cmdLower.includes('sistema') || cmdLower.includes('pc')) {
+                    resposta = respostasSistema[Math.floor(Math.random() * respostasSistema.length)];
+                } else if (cmdLower.includes('combate') || cmdLower.includes('atacar') || cmdLower.includes('defesa')) {
+                    resposta = respostasCombate[Math.floor(Math.random() * respostasCombate.length)];
+                } else if (cmdLower.includes('tempo') || cmdLower.includes('clima') || cmdLower.includes('chuva')) {
+                    resposta = respostasClima[Math.floor(Math.random() * respostasClima.length)];
+                } else {
+                    resposta = respostasPadrao[Math.floor(Math.random() * respostasPadrao.length)];
+                }
+
+                appendLine('Sivraj: "' + resposta + '"', 'sivraj-line');
+            }, 800);
+        }
+    });
+
+    function appendLine(text, className) {
+        const line = document.createElement('div');
+        line.className = 'output-line ' + className;
+        line.textContent = text;
+        terminalBody.appendChild(line);
+        terminalBody.scrollTop = terminalBody.scrollHeight;
+    }
+</script>
+
+</body>
+</html>
