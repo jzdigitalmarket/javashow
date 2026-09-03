@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXUS-7 | Three.js Robotics FX</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #02040a; font-family: 'Courier New', monospace; }
+  #app { position: fixed; inset: 0; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #4ff0ff; text-shadow: 0 0 8px #0ff; }
+  .corner { position: absolute; padding: 18px; font-size: 12px; letter-spacing: 2px; line-height: 1.7; }
+  .tl { top: 0; left: 0; } .tr { top: 0; right: 0; text-align: right; }
+  .bl { bottom: 0; left: 0; } .br { bottom: 0; right: 0; text-align: right; }
+  .title { font-size: 22px; font-weight: bold; }
+  .bar { width: 180px; height: 4px; background: rgba(79,240,255,.15); margin: 4px 0 8px; overflow: hidden; }
+  .bar > div { height: 100%; background: #4ff0ff; box-shadow: 0 0 10px #4ff0ff; width: 60%; transition: width .3s; }
+  .scan { position: fixed; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px); }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: #02040a; color: #4ff0ff; font-size: 14px; letter-spacing: 4px; z-index: 10; transition: opacity .8s; }
+  #error { display: none; position: fixed; inset: 0; color: #ff5a5a; padding: 40px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="scan"></div>
+
+<div id="hud">
+  <div class="corner tl">
+    <div class="title">NEXUS-7</div>
+    <div>UNIDADE ROBÓTICA AUTÔNOMA</div>
+    <div>STATUS: <span id="status">ONLINE</span></div>
+  </div>
+  <div class="corner tr">
+    <div>FPS <span id="fps">--</span></div>
+    <div>TEMPO <span id="time">0.00</span>s</div>
+    <div>RENDER: WebGL2 + BLOOM</div>
+  </div>
+  <div class="corner bl">
+    <div>NÚCLEO DE ENERGIA</div><div class="bar"><div id="bar-core"></div></div>
+    <div>INTEGRIDADE SISTEMA</div><div class="bar"><div id="bar-sys" style="width:96%"></div></div>
+  </div>
+  <div class="corner br">
+    <div>ARRASTE PARA ORBITAR</div>
+    <div>MOVA O MOUSE → RASTREIO</div>
+    <div>CLIQUE → PULSO EMP</div>
+  </div>
+</div>
+
+<div id="loading">INICIALIZANDO SISTEMAS...</div>
+<div id="error"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// ============================================================
+//  CONFIGURAÇÃO
+// ============================================================
+const CFG = {
+  cyan: new THREE.Color(0x4ff0ff),
+  orange: new THREE.Color(0xff7a1a),
+  bloom: { strength: 1.2, radius: 0.6, threshold: 0.25 },
+  particles: 2500,
+};
+
+try { main(); } catch (e) { showError(e); }
+
+function showError(e) {
+  console.error(e);
+  const el = document.getElementById('error');
+  el.style.display = 'block';
+  el.textContent = 'FALHA AO INICIALIZAR WEBGL: ' + e.message;
+  document.getElementById('loading').style.display = 'none';
+}
+
+function main() {
+  // ============================================================
+  //  RENDERER / CENA / CÂMERA
+  // ============================================================
+  const canvasParent = document.getElementById('app');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  canvasParent.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x02040a);
+  scene.fog = new THREE.FogExp2(0x02040a, 0.035);
+
+  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(6, 3.5, 9);
+
+  // Ambiente PBR sem texturas externas (reflexos metálicos)
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.6;
+  controls.minDistance = 4;
+  controls.maxDistance = 25;
+  controls.maxPolarAngle = Math.PI * 0.49;
+  controls.target.set(0, 1.8, 0);
+
+  // ============================================================
+  //  LUZES
+  // ============================================================
+  scene.add(new THREE.HemisphereLight(0x3a5a7a, 0x050810, 0.6));
+
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  keyLight.position.set(5, 8, 5);
+  scene.add(keyLight);
+
+  const cyanLight = new THREE.PointLight(CFG.cyan, 40, 20, 2);
+  cyanLight.position.set(-4, 3, 3);
+  scene.add(cyanLight);
+
+  const orangeLight = new THREE.PointLight(CFG.orange, 25, 20, 2);
+  orangeLight.position.set(4, 1, -3);
+  scene.add(orangeLight);
+
+  // ============================================================
+  //  MATERIAIS
+  // ============================================================
+  const matMetal  = new THREE.MeshStandardMaterial({ color: 0x1c2533, metalness: 0.95, roughness: 0.3 });
+  const matDark   = new THREE.MeshStandardMaterial({ color: 0x0a0e15, metalness: 0.8, roughness: 0.45 });
+  const matGlow   = new THREE.MeshStandardMaterial({ color: CFG.cyan, emissive: CFG.cyan, emissiveIntensity: 3 });
+  const matOrange = new THREE.MeshStandardMaterial({ color: CFG.orange, emissive: CFG.orange, emissiveIntensity: 2.5 });
+
+  // ============================================================
+  //  PISO HOLOGRÁFICO (shader)
+  // ============================================================
+  const floorMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { uTime: { value: 0 }, uColor: { value: CFG.cyan }, uPulse: { value: 0 } },
+    vertexShader: /* glsl */`
+      varying vec3 vPos;
+      void main() {
+        vPos = (modelMatrix * vec4(position, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: /* glsl */`
+      uniform float uTime; uniform vec3 uColor; uniform float uPulse;
+      varying vec3 vPos;
+      float grid(vec2 p, float s) {
+        vec2 g = abs(fract(p * s - 0.5) - 0.5) / fwidth(p * s);
+        return 1.0 - min(min(g.x, g.y), 1.0);
+      }
+      void main() {
+        float d = length(vPos.xz);
+        float g1 = grid(vPos.xz, 1.0) * 0.25;
+        float g2 = grid(vPos.xz, 0.2) * 0.7;
+        float ring = smoothstep(0.6, 0.0, abs(d - mod(uTime * 5.0, 45.0))) * 0.9;
+        float shock = smoothstep(1.2, 0.0, abs(d - uPulse * 30.0)) * (1.0 - uPulse) * 2.0;
+        float fade = 1.0 - smoothstep(8.0, 40.0, d);
+        float a = (g1 + g2 + ring + shock) * fade;
+        gl_FragColor = vec4(uColor * (1.0 + shock), a);
+      }`
+  });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  // ============================================================
+  //  ROBÔ PROCEDURAL — NEXUS-7
+  // ============================================================
+  const robot = new THREE.Group();
+  scene.add(robot);
+
+  const mesh = (geo, mat, x = 0, y = 0, z = 0, parent = robot) => {
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m;
+  };
+
+  // Torso e pélvis
+  mesh(new THREE.CylinderGeometry(0.9, 1.15, 2.2, 8), matMetal, 0, 2.6);
+  mesh(new THREE.CylinderGeometry(0.65, 0.85, 0.6, 8), matDark, 0, 1.2);
+  // Detalhes no peito
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    mesh(new THREE.BoxGeometry(0.08, 1.6, 0.08), matGlow, Math.cos(a) * 1.0, 2.6, Math.sin(a) * 1.0);
+  }
+
+  // Núcleo de energia (shader Fresnel + ruído)
+  const coreMat = new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: { uTime: { value: 0 }, uColor: { value: CFG.cyan }, uPower: { value: 1 } },
+    vertexShader: /* glsl */`
+      uniform float uTime;
+      varying vec3 vN; varying vec3 vV;
+      float hash(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,45.164))) * 43758.5453); }
+      void main() {
+        float n = sin(position.x*6.0 + uTime*3.0) * sin(position.y*6.0 + uTime*2.0) * sin(position.z*6.0 + uTime*4.0);
+        vec3 p = position + normal * n * 0.06;
+        vec4 wp = modelMatrix * vec4(p, 1.0);
+        vN = normalize(mat3(modelMatrix) * normal);
+        vV = normalize(cameraPosition - wp.xyz);
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uColor; uniform float uTime; uniform float uPower;
+      varying vec3 vN; varying vec3 vV;
+      void main() {
+        float fres = pow(1.0 - max(dot(vN, vV), 0.0), 2.0);
+        float pulse = 0.75 + 0.25 * sin(uTime * 6.0);
+        vec3 col = mix(uColor, vec3(1.0), fres * 0.6) * (1.5 + fres * 3.0) * pulse * uPower;
+        gl_FragColor = vec4(col, 0.9);
+      }`
+  });
+  const core = mesh(new THREE.IcosahedronGeometry(0.45, 4), coreMat, 0, 2.7, 0.75);
+
+  // Cabeça (grupo com pivô no pescoço)
+  mesh(new THREE.CylinderGeometry(0.25, 0.3, 0.35, 8), matDark, 0, 3.85);
+  const head = new THREE.Group(); head.position.set(0, 4.05, 0); robot.add(head);
+  mesh(new THREE.BoxGeometry(1.25, 0.9, 1.05), matMetal, 0, 0.45, 0, head);
+  const visor = mesh(new THREE.BoxGeometry(1.0, 0.22, 0.1), matGlow, 0, 0.5, 0.53, head);
+  mesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), matGlow, 0.45, 1.2, 0, head);   // antena D
+  mesh(new THREE.BoxGeometry(0.06, 0.35, 0.06), matOrange, -0.45, 1.1, 0, head); // antena E
+  mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.15, 12), matDark, 0.7, 0.45, 0, head).rotation.z = Math.PI / 2;
+  mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.15, 12), matDark, -0.7, 0.45, 0, head).rotation.z = Math.PI / 2;
+
+  // Braços articulados (ombro → cotovelo → mão)
+  function buildArm(side) {
+    const shoulder = new THREE.Group(); shoulder.position.set(side * 1.25, 3.4, 0); robot.add(shoulder);
+    mesh(new THREE.SphereGeometry(0.32, 16, 16), matDark, 0, 0, 0, shoulder);
+    mesh(new THREE.CylinderGeometry(0.2, 0.16, 1.2, 8), matMetal, 0, -0.65, 0, shoulder);
+    mesh(new THREE.TorusGeometry(0.2, 0.03, 8, 24), matGlow, 0, -0.9, 0, shoulder).rotation.x = Math.PI / 2;
+
+    const elbow = new THREE.Group(); elbow.position.set(0, -1.3, 0); shoulder.add(elbow);
+    mesh(new THREE.SphereGeometry(0.22, 16, 16), matDark, 0, 0, 0, elbow);
+    mesh(new THREE.CylinderGeometry(0.15, 0.12, 1.1, 8), matMetal, 0, -0.6, 0, elbow);
+    mesh(new THREE.BoxGeometry(0.28, 0.35, 0.28), matDark, 0, -1.3, 0, elbow);
+    mesh(new THREE.SphereGeometry(0.08, 8, 8), side > 0 ? matOrange : matGlow, 0, -1.5, 0, elbow);
+    return { shoulder, elbow };
+  }
+  const armL = buildArm(-1), armR = buildArm(1);
+
+  // Propulsor (o robô flutua)
+  const thruster = mesh(new THREE.ConeGeometry(0.5, 1.4, 16, 1, true), matGlow, 0, 0.3);
+  thruster.rotation.x = Math.PI;
+  thruster.material = matGlow.clone();
+  thruster.material.transparent = true;
+  thruster.material.opacity = 0.55;
+  thruster.material.side = THREE.DoubleSide;
+
+  // ============================================================
+  //  ANÉIS DE DADOS HOLOGRÁFICOS
+  // ============================================================
+  const ringMat = new THREE.ShaderMaterial({
+    transparent: true, side: THREE.DoubleSide, depthWrite: false,
+    uniforms: { uTime: { value: 0 }, uColor: { value: CFG.cyan }, uSeg: { value: 24 }, uDir: { value: 1 } },
+    vertexShader: /* glsl */`
+      varying vec2 vUv;
+      void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: /* glsl */`
+      uniform float uTime; uniform vec3 uColor; uniform float uSeg; uniform float uDir;
+      varying vec2 vUv;
+      void main(){
+        float ang = atan(vUv.y - 0.5, vUv.x - 0.5) / 6.2831853 + 0.5;
+        float dash = step(0.5, fract(ang * uSeg + uTime * 0.4 * uDir));
+        float r = length(vUv - 0.5) * 2.0;
+        float edge = smoothstep(0.75, 0.8, r) * (1.0 - smoothstep(0.98, 1.0, r));
+        float a = dash * edge * 0.9;
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(uColor * 2.5, a);
+      }`
+  });
+  const rings = [];
+  [[3.2, 24, 1, 0.3], [4.2, 40, -1, -0.2], [2.4, 12, 1, 0.5]].forEach(([r, seg, dir, tilt], i) => {
+    const m = ringMat.clone();
+    m.uniforms.uSeg.value = seg; m.uniforms.uDir.value = dir;
+    m.uniforms.uColor.value = i === 1 ? CFG.orange : CFG.cyan;
+    const ring = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), m);
+    ring.position.y = 2.6; ring.rotation.x = Math.PI / 2 + tilt;
+    scene.add(ring); rings.push(ring);
+  });
+
+  // ============================================================
+  //  PARTÍCULAS DE DADOS
+  // ============================================================
+  const pCount = CFG.particles;
+  const pPos = new Float32Array(pCount * 3), pSeed = new Float32Array(pCount);
+  for (let i = 0; i < pCount; i++) {
+    const r = 3 + Math.random() * 22, a = Math.random() * Math.PI * 2;
+    pPos[i * 3] = Math.cos(a) * r; pPos[i * 3 + 1] = Math.random() * 12; pPos[i * 3 + 2] = Math.sin(a) * r;
+    pSeed[i] = Math.random();
+  }
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  pGeo.setAttribute('aSeed', new THREE.BufferAttribute(pSeed, 1));
+  const pMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { uTime: { value: 0 }, uC1: { value: CFG.cyan }, uC2: { value: CFG.orange }, uPR: { value: renderer.getPixelRatio() } },
+    vertexShader: /* glsl */`
+      attribute float aSeed; uniform float uTime; uniform float uPR;
+      varying float vSeed; varying float vAlpha;
+      void main(){
+        vSeed = aSeed;
+        vec3 p = position;
+        p.y = mod(p.y + uTime * (0.3 + aSeed * 0.8), 12.0);
+        p.x += sin(uTime * 0.5 + aSeed * 20.0) * 0.3;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = (2.0 + aSeed * 5.0) * uPR * (12.0 / -mv.z);
+        vAlpha = 0.4 + 0.6 * sin(uTime * 3.0 + aSeed * 50.0);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uC1; uniform vec3 uC2; varying float vSeed; varying float vAlpha;
+      void main(){
+        float d = length(gl_PointCoord - 0.5);
+        if (d > 0.5) discard;
+        float glow = pow(1.0 - d * 2.0, 2.0);
+        vec3 col = mix(uC1, uC2, step(0.85, vSeed));
+        gl_FragColor = vec4(col * 2.0, glow * vAlpha);
+      }`
+  });
+  scene.add(new THREE.Points(pGeo, pMat));
+
+  // ============================================================
+  //  PÓS-PROCESSAMENTO
+  // ============================================================
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight),
+    CFG.bloom.strength, CFG.bloom.radius, CFG.bloom.threshold);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+
+  // ============================================================
+  //  INTERAÇÃO
+  // ============================================================
+  const mouse = new THREE.Vector2(0, 0);
+  const headTarget = new THREE.Vector2(0, 0);
+  let pulseT = 1; // 1 = inativo; 0 → 1 = onda em progresso
+
+  window.addEventListener('pointermove', (e) => {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  });
+  window.addEventListener('pointerdown', () => { pulseT = 0; });
+
+  window.addEventListener('resize', () => {
+    const w = window.innerWidth, h = window.innerHeight;
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    renderer.setSize(w, h); composer.setSize(w, h);
+    pMat.uniforms.uPR.value = renderer.getPixelRatio();
+  });
+
+  // ============================================================
+  //  LOOP DE ANIMAÇÃO
+  // ============================================================
+  const clock = new THREE.Clock();
+  const $fps = document.getElementById('fps'), $time = document.getElementById('time');
+  const $core = document.getElementById('bar-core'), $status = document.getElementById('status');
+  let fpsAcc = 0, fpsFrames = 0;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05); // evita saltos após troca de aba
+    const t = clock.elapsedTime;
+
+    // Uniforms de tempo
+    floorMat.uniforms.uTime.value = t;
+    coreMat.uniforms.uTime.value = t;
+    pMat.uniforms.uTime.value = t;
+    rings.forEach((r, i) => { r.material.uniforms.uTime.value = t; r.rotation.z += dt * (0.1 + i * 0.05); });
+
+    // Robô flutuando
+    robot.position.y = Math.sin(t * 1.2) * 0.15;
+    robot.rotation.y = Math.sin(t * 0.3) * 0.08;
+
+    // Cabeça rastreia o mouse (com suavização)
+    headTarget.set(mouse.x * 0.7, mouse.y * 0.4);
+    head.rotation.y += (headTarget.x - head.rotation.y) * 0.08;
+    head.rotation.x += (-headTarget.y - head.rotation.x) * 0.08;
+
+    // Braços
+    armL.shoulder.rotation.x = Math.sin(t * 1.5) * 0.25 + 0.2;
+    armL.shoulder.rotation.z = 0.25 + Math.sin(t * 0.8) * 0.1;
+    armL.elbow.rotation.x = -0.6 + Math.sin(t * 1.5 + 1) * 0.3;
+    armR.shoulder.rotation.x = Math.sin(t * 1.5 + Math.PI) * 0.25 + 0.2;
+    armR.shoulder.rotation.z = -0.25 - Math.sin(t * 0.8) * 0.1;
+    armR.elbow.rotation.x = -0.6 + Math.sin(t * 1.5 + Math.PI + 1) * 0.3;
+
+    // Núcleo, visor e propulsor
+    core.rotation.y += dt * 0.8; core.rotation.x += dt * 0.4;
+    visor.material.emissiveIntensity = 2.5 + Math.random() * 1.2; // cintilação
+    thruster.scale.y = 0.8 + Math.sin(t * 25) * 0.15;
+    thruster.material.opacity = 0.4 + Math.random() * 0.25;
+
+    // Luzes dinâmicas
+    cyanLight.position.set(Math.cos(t * 0.7) * 5, 3 + Math.sin(t) * 1.5, Math.sin(t * 0.7) * 5);
+    orangeLight.position.set(Math.cos(t * 0.5 + Math.PI) * 5, 1.5, Math.sin(t * 0.5 + Math.PI) * 5);
+
+    // Pulso EMP (clique)
+    if (pulseT < 1) {
+      pulseT = Math.min(pulseT + dt * 0.6, 1);
+      floorMat.uniforms.uPulse.value = pulseT;
+      const k = 1 - pulseT;
+      bloom.strength = CFG.bloom.strength + k * 2.5;
+      coreMat.uniforms.uPower.value = 1 + k * 3;
+      $status.textContent = 'PULSO EMP';
+    } else {
+      floorMat.uniforms.uPulse.value = 1;
+      bloom.strength = CFG.bloom.strength;
+      coreMat.uniforms.uPower.value = 1;
+      $status.textContent = 'ONLINE';
+    }
+
+    // HUD
+    fpsAcc += dt; fpsFrames++;
+    if (fpsAcc >= 0.5) { $fps.textContent = Math.round(fpsFrames / fpsAcc); fpsAcc = 0; fpsFrames = 0; }
+    $time.textContent = t.toFixed(2);
+    $core.style.width = (70 + Math.sin(t * 6) * 20) + '%';
+
+    controls.update();
+    composer.render();
+  }
+
+  animate();
+  const loading = document.getElementById('loading');
+  loading.style.opacity = 0;
+  setTimeout(() => loading.remove(), 900);
+}
+</script>
+</body>
+</html>
