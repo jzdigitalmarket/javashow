@@ -417,7 +417,7 @@ function main() {
       pulseT = Math.min(pulseT + dt * 0.6, 1);
       floorMat.uniforms.uPulse.value = pulseT;
       const k = 1 - pulseT;
-      bloom.strength = CFG.bloom.strength + k * 2.5;
+      bloom.strength = CFG.bloom.strength + k * 1.5;
       coreMat.uniforms.uPower.value = 1 + k * 3;
       $status.textContent = 'PULSO EMP';
     } else {
