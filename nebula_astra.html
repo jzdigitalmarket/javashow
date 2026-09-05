@@ -1,0 +1,2582 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>NEXUS // Operação Órbita Fantasma</title>
+
+  <style>
+    :root {
+      --cyan: #63f7ff;
+      --muted: #83a5b9;
+      --pink: #ff467d;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #02040b;
+      color: #dcfbff;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    canvas#world {
+      display: block;
+      position: fixed;
+      inset: 0;
+    }
+
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      user-select: none;
+      z-index: 2;
+    }
+
+    #hud::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        transparent 0 3px,
+        rgba(100, 220, 255, .018) 3px 4px
+      );
+      box-shadow: inset 0 0 130px #00101d90;
+    }
+
+    .top {
+      position: absolute;
+      top: 25px;
+      left: 28px;
+      right: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    .brand {
+      color: var(--cyan);
+      font-size: 25px;
+      font-weight: 900;
+      letter-spacing: 7px;
+      text-shadow: 0 0 25px #00cfff80;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 3px;
+      margin-top: 8px;
+    }
+
+    .telemetry {
+      text-align: right;
+      font-size: 12px;
+      line-height: 1.9;
+      color: var(--cyan);
+    }
+
+    #reticle {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 34px;
+      height: 34px;
+      transform: translate(-50%, -50%);
+      border: 1px solid #72efff77;
+      border-radius: 50%;
+      box-shadow: 0 0 15px #00cfff22;
+    }
+
+    #reticle::before, #reticle::after {
+      content: "";
+      position: absolute;
+      background: #affaff;
+    }
+
+    #reticle::before {
+      width: 2px;
+      height: 10px;
+      left: 15px;
+      top: 11px;
+    }
+
+    #reticle::after {
+      height: 2px;
+      width: 10px;
+      top: 15px;
+      left: 11px;
+    }
+
+    #reticle.hit {
+      border-color: #ffbd69;
+      box-shadow: 0 0 25px #ff7648;
+    }
+
+    #target {
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      transform: translate(-50%, -50%);
+      border: 1px dashed #ff557a;
+      color: #ff9bab;
+      display: none;
+    }
+
+    #target span {
+      position: absolute;
+      top: 69px;
+      left: -14px;
+      width: 110px;
+      text-align: center;
+      font-size: 10px;
+    }
+
+    #message {
+      position: absolute;
+      top: 20%;
+      width: 100%;
+      text-align: center;
+      font-size: 12px;
+      letter-spacing: 5px;
+      color: var(--cyan);
+      text-shadow: 0 0 20px #00dfff;
+    }
+
+    .bottom {
+      position: absolute;
+      bottom: 28px;
+      left: 28px;
+      width: 230px;
+      padding: 18px;
+      border: 1px solid #51ddff33;
+      background: linear-gradient(120deg, #021725cc, #03101d55);
+      backdrop-filter: blur(6px);
+    }
+
+    .meter { margin: 12px 0; }
+
+    .label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 7px;
+      font-size: 10px;
+      letter-spacing: 2px;
+    }
+
+    .track {
+      height: 4px;
+      background: #b6ebff15;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      width: 100%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan);
+      transform-origin: left;
+    }
+
+    #heatBar { background: #ff8d59; }
+    #warpBar { background: #b28aff; }
+
+    #radarBox {
+      position: absolute;
+      right: 28px;
+      bottom: 28px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 3px;
+    }
+
+    #radar {
+      display: block;
+      width: 160px;
+      height: 160px;
+      margin-top: 10px;
+    }
+
+    #hint {
+      position: absolute;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      width: 40%;
+      text-align: center;
+      font-size: 10px;
+      line-height: 1.8;
+      color: #82afc0;
+    }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: radial-gradient(ellipse, #071625aa, #01030bed);
+      backdrop-filter: blur(8px);
+    }
+
+    .panel {
+      width: min(620px, 100%);
+      padding: 42px;
+      border: 1px solid #64ecff44;
+      background: linear-gradient(145deg, #092137dd, #060916ee);
+      box-shadow: 0 0 100px #008cff16, inset 0 0 60px #00b7ff08;
+    }
+
+    .eyebrow {
+      color: var(--cyan);
+      letter-spacing: 5px;
+      font-size: 10px;
+    }
+
+    h1 {
+      font-size: clamp(35px, 7vw, 64px);
+      letter-spacing: -3px;
+      line-height: .98;
+      margin: 24px 0;
+    }
+
+    h1 em { color: var(--cyan); font-style: normal; }
+
+    .panel p {
+      color: #a1bacb;
+      line-height: 1.8;
+      font-size: 13px;
+    }
+
+    .keys {
+      border-top: 1px solid #70dfff25;
+      border-bottom: 1px solid #70dfff25;
+      padding: 15px 0;
+      margin: 24px 0;
+      line-height: 2;
+      color: #c5ecff;
+      font-size: 12px;
+    }
+
+    button {
+      width: 100%;
+      padding: 17px;
+      border: 1px solid #8af9ff;
+      background: #71f4ff;
+      color: #031523;
+      font: bold 12px ui-monospace, monospace;
+      letter-spacing: 3px;
+      cursor: pointer;
+    }
+
+    button:hover { background: #c7ffff; }
+    button:disabled { opacity: .45; cursor: wait; }
+
+    #status { font-size: 11px; margin-bottom: 0; }
+    .small { font-size: 10px !important; opacity: .75; }
+
+    @media (max-width: 700px) {
+      .top { top: 15px; left: 15px; right: 15px; }
+      .brand { font-size: 19px; }
+      .subtitle { letter-spacing: 1px; }
+      .bottom { width: 180px; left: 15px; bottom: 15px; padding: 12px; }
+      #radarBox { right: 15px; bottom: 15px; }
+      #radar { width: 120px; height: 120px; }
+      #hint { display: none; }
+      .panel { padding: 25px; }
+    }
+
+    /* ============================================================
+       MÚSICA, MENU E CONTROLES TOUCH
+       ============================================================ */
+
+    [hidden] {
+      display: none !important;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    audio:focus-visible,
+    .touch-pad:focus-visible {
+      outline: 3px solid #ffe082;
+      outline-offset: 4px;
+    }
+
+    button,
+    select,
+    input[type="file"] {
+      min-height: 48px;
+    }
+
+    canvas#world {
+      touch-action: none;
+    }
+
+    /* Permite acessar todo o menu em telas baixas. */
+    #overlay {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding:
+        max(16px, env(safe-area-inset-top))
+        max(16px, env(safe-area-inset-right))
+        max(16px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+    }
+
+    #overlay .panel {
+      flex-shrink: 0;
+      margin-block: auto;
+    }
+
+    .settings {
+      border: 1px solid #64ecff44;
+      padding: 16px;
+      margin: 20px 0;
+      min-width: 0;
+    }
+
+    .settings legend {
+      padding: 0 8px;
+      color: var(--cyan);
+      font-size: 12px;
+    }
+
+    .settings > label:not(.check-row) {
+      display: block;
+      color: #dcfbff;
+      margin: 12px 0 8px;
+      font-size: 13px;
+    }
+
+    .settings select,
+    .settings input[type="file"] {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      border: 1px solid #64ecff66;
+      border-radius: 6px;
+      background: #061523;
+      color: #dcfbff;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    .settings select option {
+      background: #061523;
+      color: #dcfbff;
+    }
+
+    .settings input[type="file"]::file-selector-button {
+      min-height: 40px;
+      margin-right: 10px;
+      border: 0;
+      border-radius: 4px;
+      background: #71f4ff;
+      color: #031523;
+      padding: 8px;
+      cursor: pointer;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+      margin-top: 8px;
+      color: #dcfbff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .check-row input {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+      accent-color: #63f7ff;
+    }
+
+    #bgMusic {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    #musicStatus {
+      color: #b5d6e6;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    #flightMenu {
+      position: fixed;
+      z-index: 4;
+      top: max(82px, calc(env(safe-area-inset-top) + 70px));
+      right: max(16px, env(safe-area-inset-right));
+      width: auto;
+      min-height: 48px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #062638e8;
+      color: #dcfbff;
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+
+    #touchControls {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
+      --pad-size: clamp(100px, 28vw, 132px);
+    }
+
+    .touch-pad {
+      position: absolute;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      width: var(--pad-size);
+      height: var(--pad-size);
+      border: 2px solid #63f7ff80;
+      border-radius: 50%;
+      background: #041a2cbb;
+      box-shadow: inset 0 0 25px #21cfff18;
+      pointer-events: auto;
+      touch-action: none;
+      display: grid;
+      place-items: center;
+      color: #d5faff;
+      text-align: center;
+    }
+
+    #movePad {
+      left: max(18px, env(safe-area-inset-left));
+    }
+
+    #aimPad {
+      right: max(18px, env(safe-area-inset-right));
+      border-color: #c59aff99;
+    }
+
+    #moveKnob {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border: 1px solid #b7fbff;
+      border-radius: 50%;
+      background: #63f7ff55;
+      pointer-events: none;
+    }
+
+    .pad-label {
+      position: absolute;
+      bottom: 10px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+
+    #aimPad span {
+      font-size: 12px;
+      line-height: 1.5;
+      pointer-events: none;
+    }
+
+    .touch-actions {
+      position: absolute;
+      left: 50%;
+      bottom: calc(
+        max(18px, env(safe-area-inset-bottom)) + var(--pad-size) + 12px
+      );
+      transform: translateX(-50%);
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      pointer-events: auto;
+    }
+
+    .touch-actions button {
+      width: 48px;
+      min-height: 50px;
+      padding: 6px 2px;
+      border: 1px solid #63f7ff99;
+      border-radius: 8px;
+      background: #062638e8;
+      color: #dcfbff;
+      font-size: 10px;
+      letter-spacing: 0;
+      touch-action: none;
+    }
+
+    .touch-actions button.pressed {
+      background: #63f7ff;
+      color: #031523;
+      box-shadow: 0 0 18px #63f7ff55;
+    }
+
+    #touchFire {
+      border-color: #ff7799;
+      background: #46152be8;
+    }
+
+    #touchHelp {
+      display: none;
+    }
+
+    body.touch-ui .top {
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      gap: 8px;
+    }
+
+    body.touch-ui .brand {
+      font-size: 17px;
+      letter-spacing: 3px;
+    }
+
+    body.touch-ui .subtitle {
+      max-width: 170px;
+      font-size: 9px;
+      letter-spacing: 1px;
+    }
+
+    body.touch-ui .telemetry {
+      font-size: 10px;
+    }
+
+    body.touch-ui .bottom {
+      top: max(82px, calc(env(safe-area-inset-top) + 72px));
+      left: max(12px, env(safe-area-inset-left));
+      bottom: auto;
+      width: 145px;
+      padding: 8px;
+    }
+
+    body.touch-ui .meter {
+      margin: 8px 0;
+    }
+
+    body.touch-ui .label {
+      font-size: 9px;
+      letter-spacing: 0;
+    }
+
+    body.touch-ui #radarBox {
+      top: max(140px, calc(env(safe-area-inset-top) + 130px));
+      right: max(12px, env(safe-area-inset-right));
+      bottom: auto;
+      font-size: 8px;
+      letter-spacing: 1px;
+    }
+
+    body.touch-ui #radar {
+      width: 82px;
+      height: 82px;
+      margin-top: 4px;
+    }
+
+    body.touch-ui #message {
+      top: 40%;
+      padding: 0 12px;
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+
+    body.touch-ui #hint,
+    body.touch-ui #desktopHelp {
+      display: none;
+    }
+
+    body.touch-ui #touchHelp {
+      display: block;
+    }
+
+    @media (max-width: 700px) {
+      #overlay .panel {
+        padding: 22px;
+      }
+
+      .settings {
+        padding: 12px;
+      }
+
+      .panel p {
+        font-size: 14px;
+      }
+
+      .keys {
+        font-size: 12px;
+        margin: 16px 0;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 540px) {
+      body.touch-ui #radarBox {
+        display: none;
+      }
+
+      body.touch-ui .bottom {
+        width: 130px;
+        top: 70px;
+      }
+
+      body.touch-ui #message {
+        top: 22%;
+      }
+
+      body.touch-ui #touchControls {
+        --pad-size: 100px;
+      }
+
+      body.touch-ui .touch-actions {
+        bottom: max(18px, env(safe-area-inset-bottom));
+      }
+    }
+
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="hud">
+    <div class="top">
+      <div>
+        <div class="brand">NEXUS / 07</div>
+        <div class="subtitle">DIVISÃO DE ROBÓTICA ORBITAL</div>
+      </div>
+      <div class="telemetry">
+        <div id="score">000000 PTS</div>
+        <div id="speed">000 M/S</div>
+        <div id="sector">SETOR FANTASMA</div>
+      </div>
+    </div>
+
+    <div id="reticle"></div>
+    <div id="target"><span></span></div>
+    <div id="message">SISTEMAS EM ESPERA</div>
+
+    <div class="bottom">
+      <div class="meter">
+        <div class="label"><span>ESCUDO</span><span id="shieldValue">100%</span></div>
+        <div class="track"><div id="shieldBar" class="fill"></div></div>
+      </div>
+      <div class="meter">
+        <div class="label"><span>TEMPERATURA</span><span id="heatValue">0%</span></div>
+        <div class="track"><div id="heatBar" class="fill"></div></div>
+      </div>
+      <div class="meter">
+        <div class="label"><span>SALTO / F</span><span id="warpValue">100%</span></div>
+        <div class="track"><div id="warpBar" class="fill"></div></div>
+      </div>
+    </div>
+
+    <div id="radarBox">
+      SENSOR TÁTICO
+      <canvas id="radar" width="240" height="240"></canvas>
+    </div>
+
+    <div id="hint">
+      WASD · ESPAÇO / CTRL · SHIFT TURBO<br>
+      MOUSE / SETAS MIRAR · J ATIRAR · F SALTO · P PAUSA
+    </div>
+  </div>
+
+  <div id="overlay">
+    <div class="panel">
+      <div class="eyebrow">EXPERIMENTO INTERATIVO // THREE.JS</div>
+      <h1 id="title">ÓRBITA<br><em>FANTASMA.</em></h1>
+      <p id="description">
+        Pilote um interceptador experimental entre máquinas autônomas,
+        ruínas orbitais e tempestades de plasma. Elimine os sentinelas.
+        Preserve seu escudo.
+      </p>
+
+      <div class="keys">
+        <div id="desktopHelp">
+          WASD — movimentar / MOUSE ou SETAS — mirar<br>
+          ESPAÇO / CTRL — subir e descer<br>
+          CLIQUE ou J — disparar / SHIFT — turbo<br>
+          F — hipervelocidade / P — pausa / R — reiniciar
+        </div>
+
+        <div id="touchHelp">
+          Direcional esquerdo — movimentar<br>
+          Arraste na área direita — mirar<br>
+          Segure TIRO, TURBO, SUBIR ou DESCER para usar<br>
+          Toque em SALTO para ativar a hipervelocidade<br>
+          Use PAUSA para trocar a música ou ajustar os controles
+        </div>
+      </div>
+
+      <fieldset class="settings">
+        <legend>TRILHA SONORA E CONTROLES</legend>
+
+        <label for="musicFiles">Adicionar músicas do dispositivo</label>
+        <input
+          id="musicFiles"
+          type="file"
+          accept="audio/*"
+          multiple
+          aria-describedby="musicStatus"
+        />
+
+        <label for="musicSelect">Trilha de fundo</label>
+        <select id="musicSelect">
+          <option value="">Sem trilha sonora</option>
+        </select>
+
+        <label class="check-row">
+          <input id="musicEnabled" type="checkbox" checked />
+          <span>Reproduzir música durante a missão</span>
+        </label>
+
+        <audio
+          id="bgMusic"
+          controls
+          loop
+          preload="metadata"
+          aria-label="Prévia e controles da trilha sonora"
+        ></audio>
+
+        <p id="musicStatus" role="status" aria-live="polite">
+          Escolha uma ou mais músicas. Os arquivos não são enviados a um servidor.
+        </p>
+
+        <label class="check-row">
+          <input id="touchEnabled" type="checkbox" />
+          <span>Exibir controles de toque</span>
+        </label>
+      </fieldset>
+
+      <button id="start" disabled>CARREGANDO SISTEMAS...</button>
+      <p id="status">Inicializando renderização e shaders.</p>
+      <p class="small">
+        Compatível com teclado, mouse e controles de toque.
+        No smartphone, experimente jogar com a tela deitada.
+        Contém flashes e movimento intenso.
+      </p>
+    </div>
+  </div>
+
+  <button
+    id="flightMenu"
+    type="button"
+    aria-label="Pausar missão e abrir configurações"
+    hidden
+  >
+    PAUSA / MENU
+  </button>
+
+  <div id="touchControls" hidden>
+    <div
+      id="movePad"
+      class="touch-pad"
+      role="group"
+      aria-label="Direcional de movimento por toque"
+    >
+      <div id="moveKnob"></div>
+      <span class="pad-label">MOVER</span>
+    </div>
+
+    <div
+      id="aimPad"
+      class="touch-pad"
+      role="group"
+      aria-label="Área de mira: arraste o dedo para orientar a nave"
+    >
+      <span>ARRASTE<br>PARA MIRAR</span>
+    </div>
+
+    <div class="touch-actions" role="group" aria-label="Ações da nave">
+      <button id="touchUp" type="button" aria-label="Subir">
+        SUBIR
+      </button>
+
+      <button id="touchDown" type="button" aria-label="Descer">
+        DESCER
+      </button>
+
+      <button id="touchBoost" type="button" aria-label="Ativar turbo">
+        TURBO
+      </button>
+
+      <button id="touchWarp" type="button" aria-label="Ativar salto">
+        SALTO
+      </button>
+
+      <button id="touchFire" type="button" aria-label="Disparar">
+        TIRO
+      </button>
+    </div>
+  </div>
+
+  <script>
+    window.spaceReady = false;
+
+    window.addEventListener("error", () => {
+      if (!window.spaceReady) {
+        document.getElementById("status").textContent =
+          "Falha ao iniciar. Confira a conexão, o suporte a WebGL2 e o console do navegador.";
+      }
+    });
+
+    setTimeout(() => {
+      if (!window.spaceReady) {
+        document.getElementById("status").textContent =
+          "O carregamento está demorando. Use um servidor local e confira o acesso à CDN.";
+      }
+    }, 15000);
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+    import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+    import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+    import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+    // ============================================================
+    // CONFIGURAÇÃO
+    // ============================================================
+
+    const TOUCH_DEVICE = window.matchMedia("(any-pointer: coarse)").matches;
+
+    const CONFIG = {
+      pixelRatio: Math.min(
+        window.devicePixelRatio || 1,
+        TOUCH_DEVICE ? 1 : 1.5
+      ),
+
+      stars: TOUCH_DEVICE ? 2500 : 6000,
+      asteroids: TOUCH_DEVICE ? 180 : 380,
+      particles: TOUCH_DEVICE ? 700 : 1800,
+
+      drones: 9,
+      cruiseSpeed: 48,
+      boostSpeed: 145,
+      warpSpeed: 620
+    };
+
+    const $ = id => document.getElementById(id);
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const clamp = THREE.MathUtils.clamp;
+    const V3 = THREE.Vector3;
+
+    const ui = {
+      overlay: $("overlay"), title: $("title"), description: $("description"),
+      start: $("start"), status: $("status"), message: $("message"),
+      score: $("score"), speed: $("speed"), sector: $("sector"),
+      shield: $("shieldBar"), heat: $("heatBar"), warp: $("warpBar"),
+      shieldValue: $("shieldValue"), heatValue: $("heatValue"),
+      warpValue: $("warpValue"), reticle: $("reticle"), target: $("target")
+    };
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      powerPreference: "high-performance"
+    });
+
+    renderer.domElement.id = "world";
+    renderer.setPixelRatio(CONFIG.pixelRatio);
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(
+      72, innerWidth / innerHeight, 0.1, 16000
+    );
+    scene.add(camera);
+
+    scene.add(new THREE.HemisphereLight(0x6aabff, 0x090617, 1.6));
+
+    const sun = new THREE.DirectionalLight(0xc0e9ff, 3.1);
+    sun.position.set(400, 300, 500);
+    scene.add(sun);
+
+    const violetLight = new THREE.DirectionalLight(0xb448ff, 1.7);
+    violetLight.position.set(-300, -80, -300);
+    scene.add(violetLight);
+
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+
+    const bloom = new UnrealBloomPass(
+      new THREE.Vector2(innerWidth, innerHeight), 1.05, 0.55, 1.0
+    );
+    composer.addPass(bloom);
+
+    const cinematic = new ShaderPass({
+      uniforms: {
+        tDiffuse: { value: null },
+        time: { value: 0 },
+        warp: { value: 0 },
+        damage: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float time, warp, damage;
+        varying vec2 vUv;
+
+        void main() {
+          vec2 p = vUv - .5;
+          float r = length(p);
+
+          vec2 uv = .5 + p * (1. - warp * .055 * r);
+          vec2 offset = p * (.0015 + warp * .025 + damage * .008);
+
+          vec3 color;
+          color.r = texture2D(tDiffuse, uv + offset).r;
+          color.g = texture2D(tDiffuse, uv).g;
+          color.b = texture2D(tDiffuse, uv - offset).b;
+
+          float vignette = 1. - smoothstep(.24, .76, r) * .55;
+          color *= vignette;
+
+          float grain = fract(sin(dot(vUv + time,
+                        vec2(12.9898, 78.233))) * 43758.5453);
+          color += (grain - .5) * .012;
+          color += vec3(.5, .015, .035) * damage * smoothstep(.12, .7, r);
+
+          gl_FragColor = vec4(color, 1.);
+        }
+      `
+    });
+
+    composer.addPass(cinematic);
+    composer.addPass(new OutputPass());
+
+    // ============================================================
+    // MATERIAIS E GEOMETRIAS COMPARTILHADOS
+    // ============================================================
+
+    const metal = new THREE.MeshStandardMaterial({
+      color: 0x263344, roughness: .42, metalness: .82
+    });
+
+    const darkMetal = new THREE.MeshStandardMaterial({
+      color: 0x080f1b, roughness: .55, metalness: .75
+    });
+
+    const armor = new THREE.MeshStandardMaterial({
+      color: 0x70879c, roughness: .38, metalness: .72
+    });
+
+    const glow = hex => new THREE.MeshBasicMaterial({
+      color: new THREE.Color(hex).multiplyScalar(3.5)
+    });
+
+    const cyan = glow(0x24dfff);
+    const pink = glow(0xff245d);
+    const purple = glow(0x903cff);
+
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const ballGeo = new THREE.IcosahedronGeometry(1, 2);
+    const ringGeo = new THREE.TorusGeometry(1, .035, 8, 96);
+
+    function mesh(geo, mat, parent, position = [0, 0, 0], scale = [1, 1, 1]) {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(...position);
+      m.scale.set(...scale);
+      parent.add(m);
+      return m;
+    }
+
+    // ============================================================
+    // NEBULOSA PROCEDURAL
+    // ============================================================
+
+    const noiseGLSL = `
+      float hash(vec3 p) {
+        p = fract(p * .3183099 + vec3(.1, .2, .3));
+        p *= 17.;
+        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+      }
+
+      float noise3(vec3 p) {
+        vec3 i = floor(p), f = fract(p);
+        f = f * f * (3. - 2. * f);
+
+        return mix(
+          mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
+              mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+          mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+              mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y),
+          f.z
+        );
+      }
+
+      float fbm(vec3 p) {
+        float value = 0., amplitude = .5;
+        for (int i = 0; i < 5; i++) {
+          value += noise3(p) * amplitude;
+          p = p * 2.03 + 7.1;
+          amplitude *= .5;
+        }
+        return value;
+      }
+    `;
+
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(7500, 32, 24),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: { time: { value: 0 } },
+        vertexShader: `
+          varying vec3 vDirection;
+          void main() {
+            vDirection = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
+          }
+        `,
+        fragmentShader: `
+          uniform float time;
+          varying vec3 vDirection;
+          ${noiseGLSL}
+
+          void main() {
+            vec3 d = normalize(vDirection);
+            float n = fbm(d * 4. + vec3(time * .003, 0., 0.));
+            float detail = fbm(d * 11. + n * 3.);
+
+            float band = pow(max(0., 1. - abs(d.y + d.x * .28)), 5.);
+            float cloud = smoothstep(.30, .77, n) * band;
+
+            vec3 color = vec3(.002, .004, .014);
+            color += mix(vec3(.025, .08, .22), vec3(.27, .025, .35), detail)
+                   * cloud * 1.35;
+            color += vec3(.01, .11, .15) * pow(detail, 4.) * band;
+
+            gl_FragColor = vec4(color, 1.);
+          }
+        `
+      })
+    );
+    scene.add(sky);
+
+    // ============================================================
+    // ESTRELAS
+    // ============================================================
+
+    const starPositions = new Float32Array(CONFIG.stars * 3);
+    const starColors = new Float32Array(CONFIG.stars * 3);
+
+    for (let i = 0; i < CONFIG.stars; i++) {
+      const direction = new V3().randomDirection().multiplyScalar(rand(4200, 6500));
+      direction.toArray(starPositions, i * 3);
+
+      const color = new THREE.Color().setHSL(rand(.48, .7), .45, rand(.6, 1));
+      color.multiplyScalar(rand(.7, 2.8)).toArray(starColors, i * 3);
+    }
+
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+    starGeo.setAttribute("color", new THREE.BufferAttribute(starColors, 3));
+
+    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+      size: 6,
+      sizeAttenuation: true,
+      vertexColors: true,
+      transparent: true,
+      opacity: .9,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    }));
+    scene.add(stars);
+
+    // ============================================================
+    // PLANETA E ATMOSFERA
+    // ============================================================
+
+    const planet = new THREE.Mesh(
+      new THREE.SphereGeometry(570, 96, 64),
+      new THREE.ShaderMaterial({
+        vertexShader: `
+          varying vec3 vNormal, vWorld, vLocal;
+          void main() {
+            vNormal = normalize(mat3(modelMatrix) * normal);
+            vLocal = normalize(position);
+            vWorld = (modelMatrix * vec4(position, 1.)).xyz;
+            gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vNormal, vWorld, vLocal;
+          ${noiseGLSL}
+
+          void main() {
+            vec3 n = normalize(vNormal);
+            vec3 view = normalize(cameraPosition - vWorld);
+
+            float land = fbm(vLocal * 7.);
+            float continents = smoothstep(.46, .55, land);
+            float light = max(dot(n, normalize(vec3(.8, .4, .7))), 0.);
+
+            vec3 ocean = vec3(.006, .045, .095);
+            vec3 ground = mix(vec3(.025, .12, .13), vec3(.13, .17, .12), land);
+            vec3 color = mix(ocean, ground, continents) * (.06 + light * 1.3);
+
+            float clouds = smoothstep(.57, .74, fbm(vLocal * 13. + 15.));
+            color = mix(color, vec3(.62, .8, .9) * (.1 + light), clouds * .75);
+
+            float cities = pow(max(0., noise3(vLocal * 210.) - .66) * 3., 4.);
+            color += vec3(.1, .85, 1.4) * cities * continents * (1. - light);
+
+            float rim = pow(1. - max(dot(n, view), 0.), 3.);
+            color += vec3(.02, .19, .36) * rim;
+
+            gl_FragColor = vec4(color, 1.);
+          }
+        `
+      })
+    );
+
+    planet.position.set(-1050, 270, -2300);
+    scene.add(planet);
+
+    const atmosphere = new THREE.Mesh(
+      new THREE.SphereGeometry(593, 64, 48),
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+        vertexShader: `
+          varying vec3 vNormal, vWorld;
+          void main() {
+            vNormal = normalize(mat3(modelMatrix) * normal);
+            vWorld = (modelMatrix * vec4(position, 1.)).xyz;
+            gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vNormal, vWorld;
+          void main() {
+            vec3 view = normalize(cameraPosition - vWorld);
+            float rim = pow(1. - abs(dot(normalize(vNormal), view)), 3.);
+            gl_FragColor = vec4(.08, .48, 1., rim * .65);
+          }
+        `
+      })
+    );
+    atmosphere.position.copy(planet.position);
+    scene.add(atmosphere);
+
+    // ============================================================
+    // ESTAÇÃO ORBITAL
+    // ============================================================
+
+    const station = new THREE.Group();
+    station.position.set(0, 15, -540);
+    station.rotation.set(.16, -.25, .1);
+    scene.add(station);
+
+    const stationRings = [];
+
+    for (let i = 0; i < 3; i++) {
+      const pivot = new THREE.Group();
+      pivot.rotation.set(i * .52, i * .35, 0);
+      station.add(pivot);
+      stationRings.push(pivot);
+
+      const radius = 65 + i * 19;
+
+      mesh(ringGeo, metal, pivot, [0, 0, 0], [radius, radius, radius]);
+
+      const line = mesh(ringGeo, i === 1 ? purple : cyan, pivot);
+      line.scale.set(radius * 1.015, radius * 1.015, radius * .18);
+
+      for (let j = 0; j < 12; j++) {
+        const angle = j / 12 * Math.PI * 2;
+        const module = mesh(
+          boxGeo, darkMetal, pivot,
+          [Math.cos(angle) * radius, Math.sin(angle) * radius, 0],
+          [10, 5, 8]
+        );
+        module.rotation.z = angle;
+
+        const strip = mesh(boxGeo, cyan, module, [0, .56, 0], [.7, .08, .7]);
+      }
+    }
+
+    mesh(ballGeo, darkMetal, station, [0, 0, 0], [17, 17, 17]);
+    mesh(ballGeo, cyan, station, [0, 0, 0], [10, 10, 10]);
+
+    for (let i = 0; i < 4; i++) {
+      const arm = new THREE.Group();
+      arm.rotation.z = i * Math.PI / 2;
+      station.add(arm);
+
+      mesh(boxGeo, metal, arm, [35, 0, 0], [58, 3, 4]);
+
+      for (let j = 0; j < 4; j++) {
+        mesh(boxGeo, armor, arm, [25 + j * 8, 10, 0], [6, 16, .7]);
+        mesh(boxGeo, purple, arm, [25 + j * 8, 10, .5], [.25, 14, .15]);
+      }
+    }
+
+    // ============================================================
+    // ASTEROIDES INSTANCIADOS
+    // ============================================================
+
+    const rockGeo = new THREE.IcosahedronGeometry(1, 1);
+    const rockPosition = rockGeo.attributes.position;
+
+    // Deformação determinística: vértices coincidentes continuam coincidentes.
+    for (let i = 0; i < rockPosition.count; i++) {
+      const x = rockPosition.getX(i);
+      const y = rockPosition.getY(i);
+      const z = rockPosition.getZ(i);
+      const deformation = 1 + .16 * Math.sin(x * 9 + y * 13 + z * 7);
+      rockPosition.setXYZ(i, x * deformation, y * deformation, z * deformation);
+    }
+    rockGeo.computeVertexNormals();
+
+    const rocks = new THREE.InstancedMesh(
+      rockGeo,
+      new THREE.MeshStandardMaterial({
+        color: 0x424556,
+        roughness: .95,
+        metalness: .15,
+        flatShading: true
+      }),
+      CONFIG.asteroids
+    );
+
+    const dummy = new THREE.Object3D();
+
+    for (let i = 0; i < CONFIG.asteroids; i++) {
+      const angle = rand(0, Math.PI * 2);
+      const radius = rand(160, 1500);
+
+      dummy.position.set(
+        Math.cos(angle) * radius,
+        rand(-230, 230),
+        Math.sin(angle) * radius - 700
+      );
+
+      dummy.rotation.set(rand(0, 6), rand(0, 6), rand(0, 6));
+      const size = rand(3, 20);
+      dummy.scale.set(size, size * rand(.6, 1.5), size * rand(.7, 1.4));
+      dummy.updateMatrix();
+
+      rocks.setMatrixAt(i, dummy.matrix);
+    }
+
+    rocks.instanceMatrix.needsUpdate = true;
+    rocks.computeBoundingSphere();
+    scene.add(rocks);
+
+    // ============================================================
+    // COCKPIT
+    // ============================================================
+
+    const cockpit = new THREE.Group();
+    camera.add(cockpit);
+
+    for (const side of [-1, 1]) {
+      const gun = mesh(
+        boxGeo, darkMetal, cockpit,
+        [side * .95, -.67, -1.6], [.28, .25, 1.35]
+      );
+
+      mesh(boxGeo, cyan, gun, [0, .56, -.05], [.45, .07, .7]);
+
+      const support = mesh(
+        boxGeo, metal, cockpit,
+        [side * 1.55, -.15, -2.2], [.07, 2.4, .1]
+      );
+      support.rotation.z = -side * .35;
+
+      mesh(boxGeo, cyan, cockpit,
+        [side * 1.05, -.91, -1.9], [.5, .018, .05]);
+    }
+
+    mesh(boxGeo, darkMetal, cockpit, [0, -1.16, -1.7], [3.2, .35, .65]);
+
+    const cockpitLight = new THREE.PointLight(0x35dcff, 2, 5);
+    cockpitLight.position.set(0, -.3, -1);
+    camera.add(cockpitLight);
+
+    // ============================================================
+    // RASTROS DE HIPERVELOCIDADE
+    // ============================================================
+
+    const streakCount = 420;
+    const streakData = [];
+    const streakPositions = new Float32Array(streakCount * 6);
+    const streakGeo = new THREE.BufferGeometry();
+
+    streakGeo.setAttribute(
+      "position", new THREE.BufferAttribute(streakPositions, 3)
+        .setUsage(THREE.DynamicDrawUsage)
+    );
+
+    const streakMaterial = new THREE.LineBasicMaterial({
+      color: new THREE.Color(0x63dfff).multiplyScalar(2),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    const streaks = new THREE.LineSegments(streakGeo, streakMaterial);
+    streaks.frustumCulled = false;
+    camera.add(streaks);
+
+    for (let i = 0; i < streakCount; i++) {
+      const a = rand(0, Math.PI * 2), r = rand(8, 90);
+      streakData.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, z: rand(-240, -5) });
+    }
+
+    // ============================================================
+    // PARTÍCULAS: POOL FIXO, SEM CRIAR MESHES EM CADA EXPLOSÃO
+    // ============================================================
+
+    const particlePositions = new Float32Array(CONFIG.particles * 3);
+    const particleColors = new Float32Array(CONFIG.particles * 3);
+    const particleLives = new Float32Array(CONFIG.particles);
+    const particleMaxLives = new Float32Array(CONFIG.particles);
+    const particleVelocities = new Float32Array(CONFIG.particles * 3);
+    const particleBaseColors = new Float32Array(CONFIG.particles * 3);
+    let particleCursor = 0;
+
+    const particleGeo = new THREE.BufferGeometry();
+    particleGeo.setAttribute("position",
+      new THREE.BufferAttribute(particlePositions, 3).setUsage(THREE.DynamicDrawUsage));
+    particleGeo.setAttribute("color",
+      new THREE.BufferAttribute(particleColors, 3).setUsage(THREE.DynamicDrawUsage));
+    particleGeo.setAttribute("life",
+      new THREE.BufferAttribute(particleLives, 1).setUsage(THREE.DynamicDrawUsage));
+
+    const particleMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: { dpr: { value: CONFIG.pixelRatio } },
+      vertexShader: `
+        attribute vec3 color;
+        attribute float life;
+        varying vec3 vColor;
+        varying float vLife;
+        uniform float dpr;
+
+        void main() {
+          vColor = color;
+          vLife = life;
+          vec4 p = modelViewMatrix * vec4(position, 1.);
+          gl_PointSize = clamp(190. * dpr / max(1., -p.z), 1., 30.);
+          gl_Position = projectionMatrix * p;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vLife;
+        void main() {
+          if (vLife <= 0.) discard;
+          float d = length(gl_PointCoord - .5);
+          if (d > .5) discard;
+          float alpha = pow(1. - d * 2., 2.);
+          gl_FragColor = vec4(vColor, alpha);
+        }
+      `
+    });
+
+    const particles = new THREE.Points(particleGeo, particleMaterial);
+    particles.frustumCulled = false;
+    scene.add(particles);
+
+    function burst(position, hex, count = 70, force = 30) {
+      const color = new THREE.Color(hex).multiplyScalar(4);
+      const direction = new V3();
+
+      for (let i = 0; i < count; i++) {
+        const index = particleCursor++ % CONFIG.particles;
+        const k = index * 3;
+
+        position.toArray(particlePositions, k);
+        direction.randomDirection().multiplyScalar(rand(force * .15, force));
+        direction.toArray(particleVelocities, k);
+        color.toArray(particleBaseColors, k);
+        color.toArray(particleColors, k);
+
+        particleLives[index] = particleMaxLives[index] = rand(.3, 1.3);
+      }
+    }
+
+    function updateParticles(dt) {
+      const damping = Math.exp(-1.7 * dt);
+
+      for (let i = 0; i < CONFIG.particles; i++) {
+        if (particleLives[i] <= 0) continue;
+
+        particleLives[i] = Math.max(0, particleLives[i] - dt);
+        const k = i * 3;
+        const fade = particleLives[i] / particleMaxLives[i];
+
+        for (let axis = 0; axis < 3; axis++) {
+          particlePositions[k + axis] += particleVelocities[k + axis] * dt;
+          particleVelocities[k + axis] *= damping;
+          particleColors[k + axis] = particleBaseColors[k + axis] * fade;
+        }
+      }
+
+      particleGeo.attributes.position.needsUpdate = true;
+      particleGeo.attributes.color.needsUpdate = true;
+      particleGeo.attributes.life.needsUpdate = true;
+    }
+
+    // ============================================================
+    // DRONES ROBÓTICOS
+    // ============================================================
+
+    const drones = [];
+
+    function createDrone() {
+      const group = new THREE.Group();
+
+      mesh(boxGeo, metal, group, [0, 0, 0], [3.7, 3.5, 2.4]);
+      mesh(ballGeo, armor, group, [0, 2.4, .25], [1.8, 1.25, 1.3]);
+      mesh(boxGeo, pink, group, [0, 2.45, 1.48], [2.6, .28, .18]);
+
+      const core = mesh(ballGeo, pink, group, [0, 0, 1.5], [.75, .75, .5]);
+
+      const arms = [];
+
+      for (const side of [-1, 1]) {
+        const arm = new THREE.Group();
+        arm.position.set(side * 2.5, .7, 0);
+        group.add(arm);
+        arms.push(arm);
+
+        mesh(ballGeo, armor, arm, [0, 0, 0], [.7, .7, .7]);
+        mesh(boxGeo, metal, arm, [side * .6, -1.2, 0], [.85, 2.4, 1]);
+        mesh(boxGeo, darkMetal, arm, [side * .6, -2.1, 1.3], [1, 1, 3.8]);
+        mesh(ballGeo, pink, arm, [side * .6, -2.1, 3.25], [.35, .35, .2]);
+
+        mesh(boxGeo, armor, group, [side * 1.2, -2.8, 0], [.9, 2.2, 1]);
+        mesh(ballGeo, cyan, group, [side * 1.2, -4, -.1], [.45, .85, .45]);
+      }
+
+      const engine = mesh(ringGeo, cyan, group, [0, 0, -1.7], [1.3, 1.3, 1.3]);
+      scene.add(group);
+
+      return {
+        group, arms, core, engine,
+        hp: 3, phase: rand(0, Math.PI * 2),
+        cooldown: rand(1.2, 3.8), respawn: 0
+      };
+    }
+
+    function placeDrone(drone, initial = false, index = 0) {
+      const local = new V3(
+        initial ? (index % 3 - 1) * 32 : rand(-100, 100),
+        initial ? (Math.floor(index / 3) - 1) * 24 : rand(-55, 55),
+        initial ? -120 - Math.floor(index / 3) * 55 : -rand(150, 280)
+      );
+
+      local.applyQuaternion(camera.quaternion).add(camera.position);
+      drone.group.position.copy(local);
+      drone.group.visible = true;
+      drone.hp = 3;
+      drone.cooldown = rand(1.5, 4);
+      drone.respawn = 0;
+    }
+
+    for (let i = 0; i < CONFIG.drones; i++) drones.push(createDrone());
+
+    // ============================================================
+    // ESTADO E PROJÉTEIS
+    // ============================================================
+
+    const keys = new Set();
+    const velocity = new V3();
+    const desiredVelocity = new V3();
+    const forward = new V3();
+    const temp = new V3();
+    const rotation = new THREE.Euler(0, 0, 0, "YXZ");
+
+    let yaw = 0, pitch = 0;
+    let active = false, dead = false, started = false;
+    let mouseDown = false, hadPointerLock = false;
+    let time = 0, score = 0, shield = 100, heat = 0, charge = 100;
+    let warpTimer = 0, warpVisual = 0, damage = 0, hitTimer = 0;
+    let fireCooldown = 0, sinceDamage = 10, overheated = false;
+
+    const bullets = [];
+    const bulletPool = [];
+    const bulletGeo = new THREE.CylinderGeometry(.11, .11, 4.5, 6);
+    bulletGeo.rotateX(Math.PI / 2);
+
+    function removeBullet(index) {
+      const bullet = bullets[index];
+      bullet.mesh.visible = false;
+      bulletPool.push(bullet);
+      bullets.splice(index, 1);
+    }
+
+    function spawnBullet(position, direction, enemy = false) {
+      const bullet = bulletPool.pop() || {
+        mesh: new THREE.Mesh(bulletGeo, cyan),
+        velocity: new V3(),
+        previous: new V3(),
+        life: 0,
+        enemy: false
+      };
+
+      if (!bullet.mesh.parent) scene.add(bullet.mesh);
+
+      bullet.enemy = enemy;
+      bullet.life = enemy ? 4 : 2.2;
+      bullet.mesh.material = enemy ? pink : cyan;
+      bullet.mesh.visible = true;
+      bullet.mesh.position.copy(position);
+      bullet.mesh.quaternion.setFromUnitVectors(new V3(0, 0, 1), direction);
+      bullet.velocity.copy(direction).multiplyScalar(enemy ? 110 : 390);
+
+      if (!enemy) bullet.velocity.add(velocity);
+      bullets.push(bullet);
+    }
+
+    // Distância de um ponto a um segmento:
+    // detecta impactos mesmo quando um tiro atravessa o alvo entre frames.
+    const segmentDirection = new V3();
+    const closestPoint = new V3();
+
+    function segmentDistanceSquared(point, a, b) {
+      segmentDirection.subVectors(b, a);
+      const lengthSquared = segmentDirection.lengthSq();
+
+      const t = lengthSquared === 0 ? 0 : clamp(
+        closestPoint.subVectors(point, a).dot(segmentDirection) / lengthSquared,
+        0, 1
+      );
+
+      closestPoint.copy(a).addScaledVector(segmentDirection, t);
+      return closestPoint.distanceToSquared(point);
+    }
+
+    function fire() {
+      if (fireCooldown > 0 || overheated || warpTimer > 0) return;
+
+      camera.getWorldDirection(forward);
+      const aim = camera.position.clone().addScaledVector(forward, 450);
+
+      for (const side of [-1, 1]) {
+        const origin = new V3(side * .95, -.67, -2.4)
+          .applyQuaternion(camera.quaternion)
+          .add(camera.position);
+
+        const direction = aim.clone().sub(origin).normalize();
+        spawnBullet(origin, direction);
+      }
+
+      heat = Math.min(100, heat + 6);
+      if (heat >= 100) overheated = true;
+
+      fireCooldown = .14;
+      cockpit.position.z = .085;
+    }
+
+    function updateBullets(dt) {
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const bullet = bullets[i];
+        bullet.previous.copy(bullet.mesh.position);
+        bullet.mesh.position.addScaledVector(bullet.velocity, dt);
+        bullet.life -= dt;
+
+        let hit = false;
+
+        if (bullet.enemy) {
+          if (
+            warpTimer <= 0 &&
+            segmentDistanceSquared(
+              camera.position, bullet.previous, bullet.mesh.position
+            ) < 9
+          ) {
+            shield = Math.max(0, shield - 9);
+            sinceDamage = 0;
+            damage = 1;
+            hit = true;
+
+            if (shield <= 0) {
+              dead = true;
+              pause();
+            }
+          }
+        } else {
+          for (const drone of drones) {
+            if (!drone.group.visible) continue;
+
+            if (
+              segmentDistanceSquared(
+                drone.group.position, bullet.previous, bullet.mesh.position
+              ) < 32
+            ) {
+              drone.hp--;
+              hitTimer = .13;
+              hit = true;
+              burst(bullet.mesh.position, 0xffb45c, 15, 14);
+
+              if (drone.hp <= 0) {
+                burst(drone.group.position, 0xff5c39, 100, 45);
+                burst(drone.group.position, 0x48eaff, 55, 28);
+                drone.group.visible = false;
+                drone.respawn = rand(2, 4.5);
+                score += 150;
+              }
+
+              break;
+            }
+          }
+        }
+
+        if (hit || bullet.life <= 0) removeBullet(i);
+      }
+    }
+
+    // ============================================================
+    // TRILHA SONORA
+    // ============================================================
+
+    const musicFiles = $("musicFiles");
+    const musicSelect = $("musicSelect");
+    const musicEnabled = $("musicEnabled");
+    const musicStatus = $("musicStatus");
+    const bgMusic = $("bgMusic");
+
+    const musicURLs = new Set();
+    let musicAttempt = 0;
+
+    function stopMusic() {
+      musicAttempt++;
+      bgMusic.pause();
+    }
+
+    async function startMusic() {
+      if (!active || !musicEnabled.checked || !musicSelect.value) {
+        stopMusic();
+        return;
+      }
+
+      const attempt = ++musicAttempt;
+
+      try {
+        await bgMusic.play();
+
+        if (attempt !== musicAttempt) return;
+
+        if (!active || !musicEnabled.checked) {
+          stopMusic();
+          return;
+        }
+
+        musicStatus.textContent =
+          `Tocando: ${musicSelect.selectedOptions[0].textContent}`;
+      } catch (error) {
+        if (attempt !== musicAttempt || error.name === "AbortError") return;
+
+        musicStatus.textContent =
+          error.name === "NotAllowedError"
+            ? "Abra o menu e toque no player para autorizar o áudio."
+            : "Não foi possível reproduzir esta música. Tente outro arquivo.";
+      }
+    }
+
+    function selectMusic() {
+      stopMusic();
+
+      const url = musicSelect.value;
+
+      if (!url) {
+        bgMusic.removeAttribute("src");
+        bgMusic.load();
+        musicStatus.textContent = "Trilha sonora desativada.";
+        return;
+      }
+
+      bgMusic.src = url;
+      bgMusic.load();
+
+      musicStatus.textContent =
+        `Selecionada: ${musicSelect.selectedOptions[0].textContent}. ` +
+        "Use o player para ouvir uma prévia ou inicie a missão.";
+
+      if (active) startMusic();
+    }
+
+    musicFiles.addEventListener("change", () => {
+      const files = Array.from(musicFiles.files || []);
+
+      if (!files.length) return;
+
+      stopMusic();
+      bgMusic.removeAttribute("src");
+      bgMusic.load();
+
+      for (const url of musicURLs) URL.revokeObjectURL(url);
+      musicURLs.clear();
+
+      musicSelect.replaceChildren(
+        new Option("Sem trilha sonora", "")
+      );
+
+      for (const file of files) {
+        const url = URL.createObjectURL(file);
+        musicURLs.add(url);
+        musicSelect.add(new Option(file.name, url));
+      }
+
+      musicSelect.selectedIndex = 1;
+      selectMusic();
+
+      // Permite selecionar novamente os mesmos arquivos.
+      musicFiles.value = "";
+    });
+
+    musicSelect.addEventListener("change", selectMusic);
+
+    musicEnabled.addEventListener("change", () => {
+      if (musicEnabled.checked && active) {
+        startMusic();
+      } else {
+        stopMusic();
+      }
+    });
+
+    bgMusic.addEventListener("error", () => {
+      if (!musicSelect.value) return;
+
+      musicStatus.textContent =
+        "Arquivo indisponível ou formato não suportado. Escolha outra música.";
+    });
+
+
+    // ============================================================
+    // CONTROLES TOUCH
+    // ============================================================
+
+    const touchEnabled = $("touchEnabled");
+    const touchControls = $("touchControls");
+    const flightMenu = $("flightMenu");
+
+    const movePad = $("movePad");
+    const moveKnob = $("moveKnob");
+    const aimPad = $("aimPad");
+
+    // Mantém entradas de toque separadas do teclado.
+    const moveKeys = new Set();
+    const heldTouchKeys = new Map();
+    const touchResetters = [];
+
+    function inputDown(code) {
+      if (keys.has(code) || moveKeys.has(code)) return true;
+
+      for (const heldCode of heldTouchKeys.values()) {
+        if (heldCode === code) return true;
+      }
+
+      return false;
+    }
+
+    function clearTouchInput() {
+      moveKeys.clear();
+      heldTouchKeys.clear();
+
+      for (const resetControl of touchResetters) {
+        resetControl();
+      }
+    }
+
+    function syncControlUI() {
+      const enabled = touchEnabled.checked;
+
+      document.body.classList.toggle("touch-ui", enabled);
+
+      touchControls.hidden = !active || !enabled;
+      flightMenu.hidden = !active;
+    }
+
+    touchEnabled.checked = TOUCH_DEVICE;
+
+    touchEnabled.addEventListener("change", () => {
+      clearTouchInput();
+      syncControlUI();
+    });
+
+    flightMenu.addEventListener("click", () => {
+      if (active) pause();
+    });
+
+    function releaseCapture(element, pointerId) {
+      if (
+        pointerId !== null &&
+        element.hasPointerCapture(pointerId)
+      ) {
+        element.releasePointerCapture(pointerId);
+      }
+    }
+
+
+    // ------------------------------------------------------------
+    // Direcional esquerdo
+    // ------------------------------------------------------------
+
+    let movePointer = null;
+
+    function updateMovePad(event) {
+      const rect = movePad.getBoundingClientRect();
+
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const radius = rect.width * 0.32;
+
+      let x = (event.clientX - centerX) / radius;
+      let y = (event.clientY - centerY) / radius;
+
+      const length = Math.hypot(x, y);
+
+      if (length > 1) {
+        x /= length;
+        y /= length;
+      }
+
+      moveKnob.style.transform =
+        `translate(${x * radius}px, ${y * radius}px)`;
+
+      moveKeys.clear();
+
+      const deadZone = 0.2;
+
+      if (x < -deadZone) moveKeys.add("KeyA");
+      if (x > deadZone) moveKeys.add("KeyD");
+
+      if (y < -deadZone) moveKeys.add("KeyW");
+      if (y > deadZone) moveKeys.add("KeyS");
+    }
+
+    function resetMovePad() {
+      const pointerId = movePointer;
+      movePointer = null;
+
+      moveKeys.clear();
+      moveKnob.style.transform = "translate(0, 0)";
+
+      releaseCapture(movePad, pointerId);
+    }
+
+    touchResetters.push(resetMovePad);
+
+    movePad.addEventListener("pointerdown", event => {
+      if (!active || movePointer !== null || event.button !== 0) return;
+
+      event.preventDefault();
+
+      movePointer = event.pointerId;
+      movePad.setPointerCapture(event.pointerId);
+      updateMovePad(event);
+    });
+
+    movePad.addEventListener("pointermove", event => {
+      if (event.pointerId !== movePointer || !active) return;
+
+      event.preventDefault();
+      updateMovePad(event);
+    });
+
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+      movePad.addEventListener(type, event => {
+        if (event.pointerId === movePointer) resetMovePad();
+      });
+    }
+
+
+    // ------------------------------------------------------------
+    // Área direita: arraste para mirar
+    // ------------------------------------------------------------
+
+    let aimPointer = null;
+    let aimX = 0;
+    let aimY = 0;
+
+    function resetAimPad() {
+      const pointerId = aimPointer;
+      aimPointer = null;
+
+      releaseCapture(aimPad, pointerId);
+    }
+
+    touchResetters.push(resetAimPad);
+
+    aimPad.addEventListener("pointerdown", event => {
+      if (!active || aimPointer !== null || event.button !== 0) return;
+
+      event.preventDefault();
+
+      aimPointer = event.pointerId;
+      aimX = event.clientX;
+      aimY = event.clientY;
+
+      aimPad.setPointerCapture(event.pointerId);
+    });
+
+    aimPad.addEventListener("pointermove", event => {
+      if (event.pointerId !== aimPointer || !active) return;
+
+      event.preventDefault();
+
+      const dx = event.clientX - aimX;
+      const dy = event.clientY - aimY;
+
+      aimX = event.clientX;
+      aimY = event.clientY;
+
+      const sensitivity = 0.006;
+
+      yaw -= dx * sensitivity;
+      pitch -= dy * sensitivity;
+      pitch = clamp(pitch, -1.48, 1.48);
+    });
+
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+      aimPad.addEventListener(type, event => {
+        if (event.pointerId === aimPointer) resetAimPad();
+      });
+    }
+
+
+    // ------------------------------------------------------------
+    // Botões que permanecem ativos enquanto pressionados
+    // ------------------------------------------------------------
+
+    function bindHoldButton(id, code) {
+      const button = $(id);
+      const pointers = new Set();
+
+      function refreshPressed() {
+        button.classList.toggle("pressed", pointers.size > 0);
+      }
+
+      function release(event) {
+        if (!pointers.delete(event.pointerId)) return;
+
+        heldTouchKeys.delete(event.pointerId);
+        releaseCapture(button, event.pointerId);
+        refreshPressed();
+      }
+
+      button.addEventListener("pointerdown", event => {
+        if (!active || event.button !== 0) return;
+
+        event.preventDefault();
+
+        pointers.add(event.pointerId);
+        heldTouchKeys.set(event.pointerId, code);
+
+        button.setPointerCapture(event.pointerId);
+        refreshPressed();
+      });
+
+      for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+        button.addEventListener(type, release);
+      }
+
+      touchResetters.push(() => {
+        const previousPointers = Array.from(pointers);
+
+        pointers.clear();
+        refreshPressed();
+
+        for (const pointerId of previousPointers) {
+          heldTouchKeys.delete(pointerId);
+          releaseCapture(button, pointerId);
+        }
+      });
+    }
+
+    bindHoldButton("touchUp", "Space");
+    bindHoldButton("touchDown", "ControlLeft");
+    bindHoldButton("touchBoost", "ShiftLeft");
+    bindHoldButton("touchFire", "KeyJ");
+
+    $("touchWarp").addEventListener("click", () => {
+      if (!active || charge < 100 || warpTimer > 0) return;
+
+      warpTimer = 2.4;
+      charge = 0;
+    });
+
+    touchControls.addEventListener("contextmenu", event => {
+      event.preventDefault();
+    });
+
+    window.addEventListener("resize", clearTouchInput);
+
+    syncControlUI();
+
+
+    // ============================================================
+    // INPUT, PAUSA E REINÍCIO
+    // ============================================================
+
+    function requestMouse() {
+      if (touchEnabled.checked) return;
+
+      try {
+        const result = renderer.domElement.requestPointerLock?.();
+        result?.catch?.(() => {
+          ui.status.textContent = "Mouse indisponível: use as setas para mirar.";
+        });
+      } catch {
+        ui.status.textContent = "Use as setas para mirar.";
+      }
+    }
+
+    function play() {
+      if (dead || !started) reset();
+
+      started = true;
+      active = true;
+
+      ui.overlay.style.display = "none";
+
+      syncControlUI();
+      startMusic();
+
+      // Não captura o mouse quando a interface touch está habilitada.
+      if (!touchEnabled.checked) {
+        requestMouse();
+      }
+    }
+
+    function pause() {
+      active = false;
+      mouseDown = false;
+
+      keys.clear();
+      clearTouchInput();
+
+      stopMusic();
+      syncControlUI();
+
+      ui.overlay.style.display = "flex";
+
+      ui.title.innerHTML = dead
+        ? "SINAL<br><em>PERDIDO.</em>"
+        : "MISSÃO<br><em>PAUSADA.</em>";
+
+      ui.description.textContent = dead
+        ? `Interceptador destruído. Pontuação: ${score}. Reinicie para voltar ao combate.`
+        : "Sistemas em espera. Você pode trocar a trilha sonora e ajustar os controles.";
+
+      ui.start.textContent = dead
+        ? "REINICIAR MISSÃO"
+        : "CONTINUAR MISSÃO";
+
+      ui.status.textContent = touchEnabled.checked
+        ? "Use o direcional para mover e arraste na área direita para mirar."
+        : "Mouse ou setas para orientar a nave.";
+
+      if (document.pointerLockElement === renderer.domElement) {
+        document.exitPointerLock();
+      }
+
+      ui.start.focus({ preventScroll: true });
+    }
+
+    function reset() {
+      clearTouchInput();
+
+      score = 0;
+      shield = 100;
+      heat = 0;
+      charge = 100;
+      warpTimer = 0;
+      warpVisual = 0;
+      damage = 0;
+      hitTimer = 0;
+      fireCooldown = 0;
+      sinceDamage = 10;
+      overheated = false;
+      dead = false;
+      yaw = pitch = 0;
+
+      keys.clear();
+      mouseDown = false;
+      velocity.set(0, 0, 0);
+      camera.position.set(0, 0, 40);
+      camera.quaternion.identity();
+      camera.fov = 72;
+      camera.updateProjectionMatrix();
+      cockpit.position.set(0, 0, 0);
+
+      while (bullets.length) removeBullet(bullets.length - 1);
+
+      particleLives.fill(0);
+      particleColors.fill(0);
+      particleGeo.attributes.life.needsUpdate = true;
+      particleGeo.attributes.color.needsUpdate = true;
+
+      drones.forEach((drone, i) => placeDrone(drone, true, i));
+    }
+
+    ui.start.addEventListener("click", play);
+
+    const handledKeys = new Set([
+      "Space", "ControlLeft", "ControlRight",
+      "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+      "KeyW", "KeyA", "KeyS", "KeyD", "KeyJ",
+      "KeyF", "KeyP", "KeyR", "ShiftLeft", "ShiftRight"
+    ]);
+
+    document.addEventListener("keydown", event => {
+      const editingControl = event.target instanceof Element &&
+        event.target.closest(
+          "input, select, textarea, button, audio, [contenteditable]"
+        );
+
+      if (editingControl) return;
+
+      if (handledKeys.has(event.code)) event.preventDefault();
+
+      if (!event.repeat) {
+        if (event.code === "KeyP" && started && !dead) {
+          active ? pause() : play();
+          return;
+        }
+
+        if (event.code === "Escape" && active) {
+          pause();
+          return;
+        }
+
+        if (event.code === "KeyR") {
+          reset();
+          play();
+          return;
+        }
+
+        if (event.code === "KeyF" && active && charge >= 100) {
+          warpTimer = 2.4;
+          charge = 0;
+        }
+      }
+
+      if (active) keys.add(event.code);
+    });
+
+    document.addEventListener("keyup", event => keys.delete(event.code));
+
+    document.addEventListener("mousemove", event => {
+      if (!active || document.pointerLockElement !== renderer.domElement) return;
+
+      yaw -= event.movementX * .002;
+      pitch -= event.movementY * .002;
+      pitch = clamp(pitch, -1.48, 1.48);
+    });
+
+    renderer.domElement.addEventListener("mousedown", event => {
+      if (event.button !== 0 || !active) return;
+      mouseDown = true;
+
+      if (document.pointerLockElement !== renderer.domElement) requestMouse();
+    });
+
+    document.addEventListener("mouseup", event => {
+      if (event.button === 0) mouseDown = false;
+    });
+
+    renderer.domElement.addEventListener("contextmenu", event => event.preventDefault());
+
+    document.addEventListener("pointerlockchange", () => {
+      const locked = document.pointerLockElement === renderer.domElement;
+      if (hadPointerLock && !locked && active) pause();
+      hadPointerLock = locked;
+    });
+
+    window.addEventListener("blur", () => {
+      if (active) pause();
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && active) pause();
+    });
+
+    // ============================================================
+    // MOVIMENTO E INTELIGÊNCIA DOS DRONES
+    // ============================================================
+
+    function updatePlayer(dt) {
+      const axis = (positive, negative) =>
+        Number(inputDown(positive)) - Number(inputDown(negative));
+
+      yaw += axis("ArrowLeft", "ArrowRight") * dt * 1.45;
+      pitch += axis("ArrowUp", "ArrowDown") * dt * 1.25;
+      pitch = clamp(pitch, -1.48, 1.48);
+
+      rotation.set(pitch, yaw, 0);
+      camera.quaternion.setFromEuler(rotation);
+
+      const boosting = inputDown("ShiftLeft") || inputDown("ShiftRight");
+      const descending = inputDown("ControlLeft") || inputDown("ControlRight");
+
+      desiredVelocity.set(
+        axis("KeyD", "KeyA"),
+        Number(inputDown("Space")) - Number(descending),
+        axis("KeyS", "KeyW")
+      );
+
+      if (desiredVelocity.lengthSq() > 1) desiredVelocity.normalize();
+
+      if (warpTimer > 0) {
+        desiredVelocity.set(0, 0, -CONFIG.warpSpeed);
+      } else {
+        desiredVelocity.multiplyScalar(
+          boosting ? CONFIG.boostSpeed : CONFIG.cruiseSpeed
+        );
+      }
+
+      desiredVelocity.applyQuaternion(camera.quaternion);
+      velocity.lerp(desiredVelocity, 1 - Math.exp(-5 * dt));
+      camera.position.addScaledVector(velocity, dt);
+
+      warpTimer = Math.max(0, warpTimer - dt);
+      if (warpTimer === 0) charge = Math.min(100, charge + dt * 10);
+
+      warpVisual = THREE.MathUtils.lerp(
+        warpVisual, warpTimer > 0 ? 1 : 0, 1 - Math.exp(-5 * dt)
+      );
+
+      const targetFov = warpTimer > 0 ? 105 : boosting ? 83 : 72;
+      camera.fov = THREE.MathUtils.lerp(
+        camera.fov, targetFov, 1 - Math.exp(-4 * dt)
+      );
+      camera.updateProjectionMatrix();
+
+      cockpit.rotation.z = THREE.MathUtils.lerp(
+        cockpit.rotation.z, -axis("KeyD", "KeyA") * .08,
+        1 - Math.exp(-6 * dt)
+      );
+
+      cockpit.position.z *= Math.exp(-16 * dt);
+      cockpit.position.y = Math.sin(time * 2) * .008;
+
+      fireCooldown = Math.max(0, fireCooldown - dt);
+      heat = Math.max(0, heat - dt * 22);
+      if (overheated && heat < 30) overheated = false;
+
+      if (mouseDown || inputDown("KeyJ")) fire();
+
+      sinceDamage += dt;
+      if (sinceDamage > 4) shield = Math.min(100, shield + dt * 5);
+
+      damage = Math.max(0, damage - dt * 1.8);
+      hitTimer = Math.max(0, hitTimer - dt);
+    }
+
+    function updateDrones(dt) {
+      for (const drone of drones) {
+        if (!drone.group.visible) {
+          drone.respawn -= dt;
+          if (drone.respawn <= 0) placeDrone(drone);
+          continue;
+        }
+
+        const p = drone.group.position;
+        temp.subVectors(camera.position, p);
+        const distance = temp.length();
+
+        if (distance > 950 && warpTimer === 0) {
+          placeDrone(drone);
+          continue;
+        }
+
+        temp.normalize();
+
+        const approach = distance > 115 ? 22 : distance < 48 ? -18 : 0;
+        p.addScaledVector(temp, approach * dt);
+
+        p.x += Math.cos(time * .65 + drone.phase) * dt * 7;
+        p.y += Math.sin(time * .9 + drone.phase) * dt * 5;
+
+        drone.group.lookAt(camera.position);
+        drone.arms.forEach((arm, i) => {
+          arm.rotation.z = Math.sin(time * 2.2 + drone.phase + i) * .18;
+        });
+
+        drone.core.scale.setScalar(.75 + Math.sin(time * 5 + drone.phase) * .08);
+        drone.engine.rotation.z += dt * 2;
+
+        drone.cooldown -= dt;
+
+        if (drone.cooldown <= 0 && distance < 330 && warpTimer === 0) {
+          const origin = p.clone().addScaledVector(temp, 4);
+          const aim = camera.position.clone()
+            .addScaledVector(velocity, Math.min(distance / 110, 1) * .55)
+            .add(new V3(rand(-3, 3), rand(-3, 3), rand(-3, 3)));
+
+          spawnBullet(origin, aim.sub(origin).normalize(), true);
+          drone.cooldown = rand(1.9, 3.6);
+        }
+      }
+    }
+
+    // ============================================================
+    // RADAR E HUD
+    // ============================================================
+
+    const radar = $("radar").getContext("2d");
+    const inverseQuaternion = new THREE.Quaternion();
+    const radarVector = new V3();
+    const projected = new V3();
+
+    function updateHUD() {
+      ui.score.textContent = `${String(score).padStart(6, "0")} PTS`;
+      ui.speed.textContent = `${String(Math.round(velocity.length())).padStart(3, "0")} M/S`;
+      ui.sector.textContent = `DISTÂNCIA ${Math.round(camera.position.length())} M`;
+
+      ui.shield.style.transform = `scaleX(${shield / 100})`;
+      ui.heat.style.transform = `scaleX(${heat / 100})`;
+      ui.warp.style.transform = `scaleX(${charge / 100})`;
+
+      ui.shieldValue.textContent = `${Math.ceil(shield)}%`;
+      ui.heatValue.textContent = `${Math.round(heat)}%`;
+      ui.warpValue.textContent = `${Math.floor(charge)}%`;
+
+      ui.reticle.classList.toggle("hit", hitTimer > 0);
+
+      ui.message.textContent =
+        warpTimer > 0 ? "HIPERVELOCIDADE // CAMPO ATIVO" :
+        overheated ? "ARMAS SUPERAQUECIDAS" :
+        shield < 30 ? "ALERTA // ESCUDO CRÍTICO" :
+        charge >= 100 ? "SALTO DISPONÍVEL [ F ]" : "RECARREGANDO NÚCLEO";
+
+      ui.message.style.color = overheated || shield < 30 ? "#ff668b" : "#63f7ff";
+
+      radar.clearRect(0, 0, 240, 240);
+
+      radar.fillStyle = "#021320b0";
+      radar.beginPath();
+      radar.arc(120, 120, 114, 0, Math.PI * 2);
+      radar.fill();
+
+      radar.strokeStyle = "#49d7ff38";
+      radar.lineWidth = 1;
+
+      for (const radius of [38, 76, 114]) {
+        radar.beginPath();
+        radar.arc(120, 120, radius, 0, Math.PI * 2);
+        radar.stroke();
+      }
+
+      radar.beginPath();
+      radar.moveTo(6, 120); radar.lineTo(234, 120);
+      radar.moveTo(120, 6); radar.lineTo(120, 234);
+      radar.stroke();
+
+      radar.strokeStyle = "#60f5ff88";
+      radar.beginPath();
+      radar.moveTo(120, 120);
+      radar.lineTo(
+        120 + Math.cos(time * 1.6) * 114,
+        120 + Math.sin(time * 1.6) * 114
+      );
+      radar.stroke();
+
+      inverseQuaternion.copy(camera.quaternion).invert();
+
+      let bestTarget = null;
+      let bestScreenDistance = .18;
+
+      for (const drone of drones) {
+        if (!drone.group.visible) continue;
+
+        radarVector.subVectors(drone.group.position, camera.position)
+          .applyQuaternion(inverseQuaternion);
+
+        let x = radarVector.x * .42;
+        let y = radarVector.z * .42;
+        const length = Math.hypot(x, y);
+
+        if (length > 108) {
+          x *= 108 / length;
+          y *= 108 / length;
+        }
+
+        radar.fillStyle = radarVector.y > 10 ? "#ffa763" : "#ff4976";
+        radar.beginPath();
+        radar.arc(120 + x, 120 + y, 3, 0, Math.PI * 2);
+        radar.fill();
+
+        if (radarVector.z < 0) {
+          projected.copy(drone.group.position).project(camera);
+          const distance = projected.x * projected.x + projected.y * projected.y;
+
+          if (projected.z < 1 && distance < bestScreenDistance) {
+            bestScreenDistance = distance;
+            bestTarget = {
+              x: (projected.x * .5 + .5) * innerWidth,
+              y: (-projected.y * .5 + .5) * innerHeight,
+              distance: camera.position.distanceTo(drone.group.position)
+            };
+          }
+        }
+      }
+
+      radar.fillStyle = "#9bffff";
+      radar.beginPath();
+      radar.moveTo(120, 112);
+      radar.lineTo(115, 127);
+      radar.lineTo(125, 127);
+      radar.closePath();
+      radar.fill();
+
+      ui.target.style.display = bestTarget && active ? "block" : "none";
+
+      if (bestTarget) {
+        ui.target.style.left = `${bestTarget.x}px`;
+        ui.target.style.top = `${bestTarget.y}px`;
+        ui.target.firstElementChild.textContent =
+          `SENTINELA / ${Math.round(bestTarget.distance)} M`;
+      }
+    }
+
+    // ============================================================
+    // ANIMAÇÃO E REDIMENSIONAMENTO
+    // ============================================================
+
+    function updateEnvironment(dt) {
+      sky.position.copy(camera.position);
+      stars.position.copy(camera.position);
+      sky.material.uniforms.time.value = time;
+
+      planet.rotation.y += dt * .015;
+
+      stationRings.forEach((ring, i) => {
+        ring.rotation.z += dt * (i % 2 ? -.16 : .12);
+      });
+      station.rotation.y += dt * .025;
+
+      const speedFactor = clamp(velocity.length() / CONFIG.boostSpeed, 0, 1);
+      streakMaterial.opacity = speedFactor * .15 + warpVisual * .65;
+
+      for (let i = 0; i < streakCount; i++) {
+        const s = streakData[i];
+        s.z += dt * (20 + velocity.length() * .85);
+
+        if (s.z > -3) s.z = -240;
+
+        const k = i * 6;
+        const length = .3 + speedFactor * 2 + warpVisual * 38;
+
+        streakPositions[k] = s.x;
+        streakPositions[k + 1] = s.y;
+        streakPositions[k + 2] = s.z;
+
+        streakPositions[k + 3] = s.x;
+        streakPositions[k + 4] = s.y;
+        streakPositions[k + 5] = s.z - length;
+      }
+
+      streakGeo.attributes.position.needsUpdate = true;
+
+      cinematic.uniforms.time.value = time;
+      cinematic.uniforms.warp.value = warpVisual;
+      cinematic.uniforms.damage.value = damage;
+      bloom.strength = 1.05 + warpVisual * .55;
+    }
+
+    window.addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      composer.setSize(innerWidth, innerHeight);
+    });
+
+    renderer.domElement.addEventListener("webglcontextlost", event => {
+      event.preventDefault();
+      pause();
+      ui.status.textContent =
+        "O contexto gráfico foi perdido. Recarregue a página para reiniciar.";
+      ui.start.disabled = true;
+    });
+
+    reset();
+
+    window.spaceReady = true;
+    ui.start.disabled = false;
+    ui.start.textContent = "INICIAR MISSÃO";
+    ui.status.textContent = touchEnabled.checked
+      ? "Sistemas prontos. Toque em INICIAR MISSÃO para jogar."
+      : "Sistemas prontos. Clique para entrar; use as setas se o mouse não for capturado.";
+
+    let lastTime = performance.now();
+
+    function frame(now) {
+      requestAnimationFrame(frame);
+
+      // Delta limitado para evitar saltos após travamentos ou troca de aba.
+      const dt = Math.min((now - lastTime) / 1000, .033);
+      lastTime = now;
+
+      if (active) {
+        time += dt;
+
+        updatePlayer(dt);
+        updateDrones(dt);
+        updateBullets(dt);
+        updateParticles(dt);
+        updateEnvironment(dt);
+      } else if (!started) {
+        // Cena de apresentação animada sem iniciar o combate.
+        time += dt;
+        updateEnvironment(dt);
+      }
+
+      camera.updateMatrixWorld();
+      updateHUD();
+      composer.render(dt);
+    }
+
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
