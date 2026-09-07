@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compêndio Digital 1946 - Menu 3D</title>
+    <title>Compêndio Digital 1946 - Mural Gráfico 3D</title>
     <style>
         * {
             margin: 0;
@@ -14,7 +14,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #120e0a;
+            background-color: #0b0806;
             font-family: 'Courier New', Courier, monospace;
         }
         #webgl-container {
@@ -22,81 +22,97 @@
             height: 100vh;
             display: block;
         }
-        /* Header Vintage Overlay */
-        #ui-overlay {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            color: #f1e2c3;
-            pointer-events: none;
-            text-shadow: 2px 2px 4px #000;
-            z-index: 10;
-        }
-        #ui-overlay h1 {
-            font-size: 1.8rem;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            border-bottom: 2px solid #c59b27;
-            padding-bottom: 5px;
-            margin-bottom: 5px;
-        }
-        #ui-overlay p {
-            font-size: 0.9rem;
-            color: #a89470;
-        }
-        /* Efeito de Vinheta e Textura Vintage */
-        .vignette {
+        /* Moldura de Periódico Antigo */
+        .vintage-frame {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+            border: 12px solid #1f140a;
+            box-sizing: border-box;
             pointer-events: none;
             z-index: 5;
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.9);
+        }
+        #ui-header {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #f4e3c1;
+            pointer-events: none;
+            z-index: 10;
+            width: 90%;
+            max-width: 800px;
+        }
+        #ui-header h1 {
+            font-size: 2rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #f7e1b5;
+            text-shadow: 3px 3px 0px #4a2e12, -1px -1px 0px #000;
+            border-bottom: 3px double #c39233;
+            padding-bottom: 8px;
+            margin-bottom: 6px;
+        }
+        #ui-header p {
+            font-size: 0.95rem;
+            color: #d1b480;
+            background: rgba(20, 12, 6, 0.85);
+            display: inline-block;
+            padding: 4px 16px;
+            border: 1px solid #c39233;
+            border-radius: 2px;
         }
         #tooltip {
             position: absolute;
-            bottom: 30px;
+            bottom: 25px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(30, 20, 10, 0.9);
-            border: 1px solid #c59b27;
-            color: #f1e2c3;
-            padding: 10px 20px;
-            font-size: 0.95rem;
+            background: #211309;
+            border: 2px solid #c39233;
+            color: #f7e1b5;
+            padding: 12px 24px;
+            font-size: 1rem;
             pointer-events: none;
             display: none;
             z-index: 10;
-            border-radius: 4px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            text-align: center;
+            max-width: 500px;
+        }
+        #tooltip span {
+            color: #8c2d19;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-    <div id="ui-overlay">
-        <h1>Compêndio de Ferramentas Úteis</h1>
-        <p>Arraste para navegar • Clique em uma ficha para acessar o site</p>
+    <div class="vintage-frame"></div>
+    <div id="ui-header">
+        <h1>GUIA DE 50 FERRAMENTAS E SITES ÚTEIS</h1>
+        <p>✦ O COMPÊNDIO ESSENCIAL DO CIDADÃO CONECTADO (1946) ✦</p>
     </div>
 
     <div id="tooltip"></div>
-    <div class="vignette"></div>
     <div id="webgl-container"></div>
 
-    <!-- Bibliotecas Three.js e OrbitControls via CDN -->
+    <!-- Three.js e OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
     <script>
-        // --- 1. BASE DE DADOS DOS 50 SITES ---
+        // --- 1. ESTRUTURA DE DADOS ---
         const database = [
             {
-                category: "ARTIGOS, LIVROS E APRENDIZADO",
+                category: "1. ARTIGOS & LIVROS",
+                iconType: "book",
                 items: [
                     { name: "12ft.io", desc: "Burlar paywalls de notícias e artigos", url: "https://12ft.io" },
-                    { name: "libgen.is", desc: "Download gratuito de livros didáticos", url: "https://libgen.is" },
+                    { name: "libgen.is", desc: "Download gratuito de livros acadêmicos", url: "https://libgen.is" },
                     { name: "sci-hub.se", desc: "Acesso a artigos científicos", url: "https://sci-hub.se" },
                     { name: "gutenberg.org", desc: "Biblioteca de e-books de domínio público", url: "https://gutenberg.org" },
                     { name: "pdfdrive.com", desc: "Motor de busca de livros em PDF", url: "https://pdfdrive.com" },
@@ -104,13 +120,14 @@
                     { name: "wolframalpha.com", desc: "Conhecimento computacional e matemática", url: "https://wolframalpha.com" },
                     { name: "connectedpapers.com", desc: "Mapeamento visual de artigos acadêmicos", url: "https://connectedpapers.com" },
                     { name: "semanticscholar.org", desc: "Busca acadêmica baseada em IA", url: "https://semanticscholar.org" },
-                    { name: "scispace.com", desc: "Leitura simplificada de artigos", url: "https://typeset.io" }
+                    { name: "scispace.com", desc: "Leitura e interpretação de artigos", url: "https://typeset.io" }
                 ]
             },
             {
-                category: "EDIÇÃO DE IMAGEM & DESIGN",
+                category: "2. DESIGN & VÍDEO",
+                iconType: "media",
                 items: [
-                    { name: "photopea.com", desc: "Editor de fotos completo (estilo Photoshop)", url: "https://photopea.com" },
+                    { name: "photopea.com", desc: "Editor de fotos completo (Photoshop web)", url: "https://photopea.com" },
                     { name: "squoosh.app", desc: "Compressão e otimização de imagens", url: "https://squoosh.app" },
                     { name: "ezgif.com", desc: "Criação e edição de GIFs animados", url: "https://ezgif.com" },
                     { name: "remove.bg", desc: "Remoção automática de fundo de fotos", url: "https://remove.bg" },
@@ -121,186 +138,343 @@
                 ]
             },
             {
-                category: "SEGURANÇA & PRIVACIDADE",
+                category: "3. SEGURANÇA & PRIVACIDADE",
+                iconType: "security",
                 items: [
-                    { name: "haveibeenpwned.com", desc: "Checar vazamento de senhas e e-mails", url: "https://haveibeenpwned.com" },
-                    { name: "virustotal.com", desc: "Análise de arquivos e URLs contra vírus", url: "https://virustotal.com" },
+                    { name: "haveibeenpwned.com", desc: "Verificação de vazamento de senhas", url: "https://haveibeenpwned.com" },
+                    { name: "virustotal.com", desc: "Análise de arquivos contra malwares", url: "https://virustotal.com" },
                     { name: "privnote.com", desc: "Notas salvas criptografadas autodestrutivas", url: "https://privnote.com" },
                     { name: "temp-mail.org", desc: "Gerador de e-mails descartáveis", url: "https://temp-mail.org" },
-                    { name: "file.io", desc: "Compartilhamento de arquivos temporários", url: "https://file.io" },
-                    { name: "archive.org", desc: "Preservação e consulta de histórico da web", url: "https://archive.org" },
-                    { name: "downdetector.com", desc: "Checagem de queda de serviços online", url: "https://downdetector.com" },
-                    { name: "fast.com", desc: "Teste rápido de velocidade de conexão", url: "https://fast.com" }
+                    { name: "file.io", desc: "Compartilhamento com exclusão automática", url: "https://file.io" },
+                    { name: "archive.org", desc: "Preservação de histórico de sites", url: "https://archive.org" },
+                    { name: "downdetector.com", desc: "Checagem de instabilidade de serviços", url: "https://downdetector.com" },
+                    { name: "fast.com", desc: "Teste rápido de velocidade de internet", url: "https://fast.com" }
                 ]
             },
             {
-                category: "DESENVOLVIMENTO & CÓDIGO",
+                category: "4. DESENVOLVIMENTO",
+                iconType: "code",
                 items: [
-                    { name: "alternativeto.net", desc: "Busca de alternativas gratuitas de softwares", url: "https://alternativeto.net" },
-                    { name: "phind.com", desc: "Busca com IA focada em programação", url: "https://phind.com" },
-                    { name: "regex101.com", desc: "Testador de Expressões Regulares", url: "https://regex101.com" },
-                    { name: "codebeautify.org", desc: "Formatação e visualização limpa de código", url: "https://codebeautify.org" },
+                    { name: "alternativeto.net", desc: "Busca de alternativas gratuitas de software", url: "https://alternativeto.net" },
+                    { name: "phind.com", desc: "Motor de busca com IA para desenvolvedores", url: "https://phind.com" },
+                    { name: "regex101.com", desc: "Validação e teste de Regex", url: "https://regex101.com" },
+                    { name: "codebeautify.org", desc: "Formatação limpa de código e JSON", url: "https://codebeautify.org" },
                     { name: "explainshell.com", desc: "Explicação detalhada de comandos terminal", url: "https://explainshell.com" }
                 ]
             },
             {
-                category: "ÁUDIO, MÍDIA E FOCO",
+                category: "5. ÁUDIO & RÁDIO",
+                iconType: "audio",
                 items: [
-                    { name: "justwatch.com", desc: "Guia de filmes e séries em streaming", url: "https://justwatch.com" },
-                    { name: "radio.garden", desc: "Navegação por rádios ao vivo do mundo 3D", url: "https://radio.garden" },
-                    { name: "everynoise.com", desc: "Mapeamento interativo de gêneros musicais", url: "https://everynoise.com" },
-                    { name: "tunefind.com", desc: "Identificação de músicas de filmes e séries", url: "https://tunefind.com" },
-                    { name: "musicforprogramming.net", desc: "Áudios e ruídos para foco e trabalho", url: "https://musicforprogramming.net" }
+                    { name: "justwatch.com", desc: "Guia de onde assistir filmes e séries", url: "https://justwatch.com" },
+                    { name: "radio.garden", desc: "Rádios ao vivo do mundo em globo 3D", url: "https://radio.garden" },
+                    { name: "everynoise.com", desc: "Mapeamento de milhares de gêneros musicais", url: "https://everynoise.com" },
+                    { name: "tunefind.com", desc: "Músicas de filmes, séries e jogos", url: "https://tunefind.com" },
+                    { name: "musicforprogramming.net", desc: "Áudio ambiente para foco e estudo", url: "https://musicforprogramming.net" }
                 ]
             },
             {
-                category: "PDFs & ORGANIZAÇÃO",
+                category: "6. PDF & ORGANIZAÇÃO",
+                iconType: "pdf",
                 items: [
                     { name: "summarize.tech", desc: "Resumos por IA de vídeos do YouTube", url: "https://summarize.tech" },
                     { name: "raindrop.io", desc: "Gerenciador de favoritos e links", url: "https://raindrop.io" },
-                    { name: "smallpdf.com", desc: "Ferramentas para editar e converter PDFs", url: "https://smallpdf.com" },
-                    { name: "ilovepdf.com", desc: "Juntar, dividir e comprimir arquivos PDF", url: "https://ilovepdf.com" }
+                    { name: "smallpdf.com", desc: "Ferramentas para converter e editar PDFs", url: "https://smallpdf.com" },
+                    { name: "ilovepdf.com", desc: "Juntar, dividir e comprimir PDFs", url: "https://ilovepdf.com" }
                 ]
             }
         ];
 
-        // --- 2. CONFIGURAÇÃO DA CENA THREE.JS ---
+        // --- 2. CENA & ILUMINAÇÃO THREE.JS ---
         const container = document.getElementById('webgl-container');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x14100c);
-        scene.fog = new THREE.FogExp2(0x14100c, 0.015);
+        scene.background = new THREE.Color(0x0e0a07);
+        scene.fog = new THREE.FogExp2(0x0e0a07, 0.012);
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 15, 45);
+        camera.position.set(0, 5, 52);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI / 2 - 0.05; // Não passar do chão
-        controls.minDistance = 10;
-        controls.maxDistance = 80;
+        controls.maxPolarAngle = Math.PI / 2 - 0.02;
+        controls.minDistance = 15;
+        controls.maxDistance = 85;
 
-        // --- 3. ILUMINAÇÃO VINTAGE (Luz Quente / Sombra) ---
-        const ambientLight = new THREE.AmbientLight(0xffecd6, 0.6);
+        // Luzes Retro Quentes
+        const ambientLight = new THREE.AmbientLight(0xffdfb3, 0.7);
         scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffdfa9, 1.2);
-        dirLight.position.set(20, 40, 20);
-        dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 2048;
-        dirLight.shadow.mapSize.height = 2048;
-        scene.add(dirLight);
+        const mainSpot = new THREE.SpotLight(0xffcd85, 1.8);
+        mainSpot.position.set(0, 45, 35);
+        mainSpot.angle = Math.PI / 3;
+        mainSpot.penumbra = 0.5;
+        mainSpot.castShadow = true;
+        mainSpot.shadow.mapSize.width = 2048;
+        mainSpot.shadow.mapSize.height = 2048;
+        scene.add(mainSpot);
 
-        const pointLight = new THREE.PointLight(0xd97724, 0.8, 50);
-        pointLight.position.set(-10, 10, -10);
-        scene.add(pointLight);
+        const sideLight = new THREE.PointLight(0xb54025, 1.2, 60);
+        sideLight.position.set(-30, -10, 15);
+        scene.add(sideLight);
 
-        // Chão de Madeira Escura / Mesa Retro
-        const floorGeo = new THREE.PlaneGeometry(150, 150);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x1f1610, roughness: 0.8, metalness: 0.2 });
-        const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.y = -8;
-        floor.receiveShadow = true;
-        scene.add(floor);
+        // --- 3. GERADORES DE TEXTURAS GRÁFICAS PROCEDURAIS (CANVAS 2D) ---
 
-        // --- 4. GERADOR DE TEXTURA CANVAS (Estilo Cartão 1940) ---
-        function createCardTexture(title, categoryName) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 320;
-            const ctx = canvas.getContext('2d');
-
-            // Fundo de papel antigo / sepia
-            ctx.fillStyle = '#eadecc';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Moldura interna clássica
-            ctx.strokeStyle = '#3d2817';
-            ctx.lineWidth = 8;
-            ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
-            
-            ctx.lineWidth = 2;
-            ctx.strokeRect(22, 22, canvas.width - 44, canvas.height - 44);
-
-            // Cabeçalho da Categoria
-            ctx.fillStyle = '#3d2817';
-            ctx.fillRect(24, 24, canvas.width - 48, 45);
-
-            ctx.fillStyle = '#eadecc';
-            ctx.font = 'bold 18px "Courier New", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(categoryName.substring(0, 32), canvas.width / 2, 52);
-
-            // Nome do Serviço (Centro)
-            ctx.fillStyle = '#1c120c';
-            ctx.font = 'bold 28px "Courier New", monospace';
-            ctx.fillText(title, canvas.width / 2, 170);
-
-            // Selo / Detalhe Inferior
-            ctx.strokeStyle = '#8c2d19';
+        // Função para desenhar ícones vintage retro
+        function drawRetroIcon(ctx, type, x, y, size) {
+            ctx.save();
+            ctx.strokeStyle = '#3a2212';
+            ctx.fillStyle = '#3a2212';
             ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(canvas.width / 2, 245, 25, 0, Math.PI * 2);
-            ctx.stroke();
 
-            ctx.fillStyle = '#8c2d19';
-            ctx.font = 'bold 12px "Courier New", monospace';
-            ctx.fillText('1946', canvas.width / 2, 249);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            return texture;
+            if (type === 'book') {
+                ctx.strokeRect(x - size/2, y - size/2, size, size*0.8);
+                ctx.beginPath();
+                ctx.moveTo(x, y - size/2);
+                ctx.lineTo(x, y + size*0.3);
+                ctx.stroke();
+            } else if (type === 'media') {
+                ctx.beginPath();
+                ctx.arc(x, y, size*0.4, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillRect(x - size*0.15, y - size*0.15, size*0.3, size*0.3);
+            } else if (type === 'security') {
+                ctx.beginPath();
+                ctx.moveTo(x, y - size*0.5);
+                ctx.lineTo(x + size*0.4, y - size*0.3);
+                ctx.lineTo(x + size*0.4, y + size*0.2);
+                ctx.lineTo(x, y + size*0.5);
+                ctx.lineTo(x - size*0.4, y + size*0.2);
+                ctx.lineTo(x - size*0.4, y - size*0.3);
+                ctx.closePath();
+                ctx.stroke();
+            } else if (type === 'code') {
+                ctx.font = 'bold 22px "Courier New"';
+                ctx.textAlign = 'center';
+                ctx.fillText('</>', x, y + 7);
+            } else if (type === 'audio') {
+                ctx.beginPath();
+                ctx.arc(x - 8, y + 5, 6, 0, Math.PI * 2);
+                ctx.arc(x + 8, y + 2, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillRect(x - 3, y - 12, 4, 16);
+                ctx.fillRect(x + 13, y - 15, 4, 16);
+            } else {
+                ctx.strokeRect(x - size*0.35, y - size*0.4, size*0.7, size*0.8);
+                ctx.beginPath();
+                ctx.moveTo(x - size*0.2, y - size*0.1);
+                ctx.lineTo(x + size*0.2, y - size*0.1);
+                ctx.stroke();
+            }
+            ctx.restore();
         }
 
-        // --- 5. CRIAÇÃO DOS CARTÕES 3D NA CENA ---
-        const clickableObjects = [];
-        const cardGeometry = new THREE.BoxGeometry(4.5, 3, 0.1);
+        // Fundo do Mural Vintage Grandes Proporções
+        function createBoardTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2048;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
 
-        const numCategories = database.length;
-        const colSpacing = 9; // Espaçamento entre colunas
-        const rowSpacing = 3.8; // Espaçamento vertical
+            // Papel envelhecido escuro
+            ctx.fillStyle = '#26190f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Linhas de borda / Vinco de Impressão Art Déco
+            ctx.strokeStyle = '#523720';
+            ctx.lineWidth = 12;
+            ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
+
+            ctx.lineWidth = 4;
+            ctx.strokeRect(48, 48, canvas.width - 96, canvas.height - 96);
+
+            // Textura de ruído de papel
+            for (let i = 0; i < 15000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.05)';
+                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 3, 3);
+            }
+
+            // Rodapé do Mural
+            ctx.fillStyle = '#8c2d19';
+            ctx.fillRect(50, canvas.height - 110, canvas.width - 100, 50);
+            
+            ctx.fillStyle = '#f4e3c1';
+            ctx.font = 'bold 26px "Courier New"';
+            ctx.textAlign = 'center';
+            ctx.fillText('AUMENTE SUA PRODUTIVIDADE E SABEDORIA! • IMPRESSO EM 1946', canvas.width / 2, canvas.height - 75);
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // Placa do Cabeçalho de Categoria
+        function createCategoryHeaderTexture(title, iconType, num) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 160;
+            const ctx = canvas.getContext('2d');
+
+            // Fundo da fita vintage
+            ctx.fillStyle = '#eddac2';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Moldura externa dupla
+            ctx.strokeStyle = '#3a2212';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+            ctx.lineWidth = 2;
+            ctx.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
+
+            // Selo / Círculo numérico vermelho
+            ctx.fillStyle = '#8c2d19';
+            ctx.beginPath();
+            ctx.arc(60, canvas.height / 2, 32, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#f4e3c1';
+            ctx.font = 'bold 24px "Courier New"';
+            ctx.textAlign = 'center';
+            ctx.fillText('0' + num, 60, canvas.height / 2 + 8);
+
+            // Desenhar Ícone da Categoria
+            drawRetroIcon(ctx, iconType, 440, canvas.height / 2, 36);
+
+            // Título
+            ctx.fillStyle = '#26150a';
+            ctx.font = 'bold 21px "Courier New"';
+            ctx.textAlign = 'left';
+            ctx.fillText(title.substring(3), 110, 92);
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // Cartão Individual da Ferramenta
+        function createItemCardTexture(name, desc) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 220;
+            const ctx = canvas.getContext('2d');
+
+            // Papel creme antigo
+            ctx.fillStyle = '#f2e6d3';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Bordas e Hachuras
+            ctx.strokeStyle = '#3a2212';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
+
+            ctx.lineWidth = 1;
+            ctx.strokeRect(14, 14, canvas.width - 28, canvas.height - 28);
+
+            // Faixa superior do nome
+            ctx.fillStyle = '#3a2212';
+            ctx.fillRect(16, 16, canvas.width - 32, 42);
+
+            ctx.fillStyle = '#f2e6d3';
+            ctx.font = 'bold 18px "Courier New"';
+            ctx.textAlign = 'center';
+            ctx.fillText(name, canvas.width / 2, 43);
+
+            // Descrição (Texto com Quebra)
+            ctx.fillStyle = '#1c1007';
+            ctx.font = '14px "Courier New"';
+            ctx.textAlign = 'center';
+
+            const words = desc.split(' ');
+            let line = '';
+            let y = 95;
+
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                if (ctx.measureText(testLine).width > 340 && n > 0) {
+                    ctx.fillText(line, canvas.width / 2, y);
+                    line = words[n] + ' ';
+                    y += 22;
+                } else {
+                    line = testLine;
+                }
+            }
+            ctx.fillText(line, canvas.width / 2, y);
+
+            // Carimbo vermelho retro de acionamento
+            ctx.strokeStyle = '#8c2d19';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(canvas.width / 2 - 60, 165, 120, 32);
+
+            ctx.fillStyle = '#8c2d19';
+            ctx.font = 'bold 13px "Courier New"';
+            ctx.fillText('► ACESSAR ◄', canvas.width / 2, 186);
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- 4. MONTAGEM DO MURAL 3D ---
+
+        // Prancha de Fundo
+        const boardGeo = new THREE.PlaneGeometry(85, 45);
+        const boardMat = new THREE.MeshStandardMaterial({
+            map: createBoardTexture(),
+            roughness: 0.85,
+            metalness: 0.1
+        });
+        const boardMesh = new THREE.Mesh(boardGeo, boardMat);
+        boardMesh.position.z = -2;
+        boardMesh.receiveShadow = true;
+        scene.add(boardMesh);
+
+        const clickableObjects = [];
+        const numCols = database.length;
+        const colSpacing = 13.5;
 
         database.forEach((cat, colIdx) => {
-            const xPos = (colIdx - (numCategories - 1) / 2) * colSpacing;
+            const xPos = (colIdx - (numCols - 1) / 2) * colSpacing;
 
+            // 1. Criar Placa de Cabeçalho da Categoria
+            const headerGeo = new THREE.PlaneGeometry(12, 3.8);
+            const headerMat = new THREE.MeshStandardMaterial({
+                map: createCategoryHeaderTexture(cat.category, cat.iconType, colIdx + 1),
+                roughness: 0.5
+            });
+            const headerMesh = new THREE.Mesh(headerGeo, headerMat);
+            headerMesh.position.set(xPos, 17, 0);
+            headerMesh.castShadow = true;
+            scene.add(headerMesh);
+
+            // 2. Criar Fichas de Cada Ferramenta
             cat.items.forEach((item, rowIdx) => {
-                const texture = createCardTexture(item.name, cat.category);
-                
-                // Materiais: Frente com textura, lados com papel escuro
+                const cardGeo = new THREE.BoxGeometry(11.5, 3.2, 0.2);
+                const texture = createItemCardTexture(item.name, item.desc);
+
                 const materials = [
-                    new THREE.MeshStandardMaterial({ color: 0xc4b299 }), // direita
-                    new THREE.MeshStandardMaterial({ color: 0xc4b299 }), // esquerda
-                    new THREE.MeshStandardMaterial({ color: 0xc4b299 }), // topo
-                    new THREE.MeshStandardMaterial({ color: 0xc4b299 }), // base
-                    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.6 }), // frente
-                    new THREE.MeshStandardMaterial({ color: 0xa8967d })  // verso
+                    new THREE.MeshStandardMaterial({ color: 0x2b1a0e }),
+                    new THREE.MeshStandardMaterial({ color: 0x2b1a0e }),
+                    new THREE.MeshStandardMaterial({ color: 0x2b1a0e }),
+                    new THREE.MeshStandardMaterial({ color: 0x2b1a0e }),
+                    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.6 }), // Frente
+                    new THREE.MeshStandardMaterial({ color: 0x3d2717 })  // Trás
                 ];
 
-                const card = new THREE.Mesh(cardGeometry, materials);
-                
-                // Disposição em grade inclinada (tipo fichário)
-                const yPos = (cat.items.length - rowIdx) * 1.2 - 2;
-                const zPos = rowIdx * 2.2 - (cat.items.length * 1.1);
+                const card = new THREE.Mesh(cardGeo, materials);
+                const yPos = 12.5 - (rowIdx * 3.6);
 
-                card.position.set(xPos, yPos, zPos);
-                card.rotation.x = -Math.PI / 12; // Leve inclinação para trás
+                card.position.set(xPos, yPos, 0.2);
                 card.castShadow = true;
                 card.receiveShadow = true;
 
-                // Metadados anexados ao objeto 3D
                 card.userData = {
                     name: item.name,
                     desc: item.desc,
                     url: item.url,
                     category: cat.category,
-                    originalPos: card.position.clone(),
-                    originalRot: card.rotation.clone()
+                    originalPos: card.position.clone()
                 };
 
                 scene.add(card);
@@ -308,7 +482,21 @@
             });
         });
 
-        // --- 6. RAYCASTING E INTERAÇÃO COM MOUSE ---
+        // Partículas de poeira vintage flutuantes no ar
+        const particleGeo = new THREE.BufferGeometry();
+        const count = 300;
+        const positions = new Float32Array(count * 3);
+        for(let i=0; i<count*3; i+=3) {
+            positions[i] = (Math.random() - 0.5) * 100;
+            positions[i+1] = (Math.random() - 0.5) * 60;
+            positions[i+2] = Math.random() * 40;
+        }
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const particleMat = new THREE.PointsMaterial({ size: 0.25, color: 0xffd89e, transparent: true, opacity: 0.4 });
+        const particles = new THREE.Points(particleGeo, particleMat);
+        scene.add(particles);
+
+        // --- 5. INTERAÇÃO E RAYCASTING ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         const tooltip = document.getElementById('tooltip');
@@ -328,15 +516,13 @@
                     resetHovered();
                     hoveredObject = obj;
                     
-                    // Animação de elevação da ficha ao passar o mouse
                     document.body.style.cursor = 'pointer';
-                    obj.position.z += 0.8;
-                    obj.position.y += 0.4;
-                    obj.rotation.x = 0; // Fica reta para o usuário
+                    // Efeito 3D ao passar o mouse: Cartão salta do mural
+                    obj.position.z = 2.2;
+                    obj.scale.set(1.06, 1.06, 1.06);
 
-                    // Atualiza Tooltip
                     tooltip.style.display = 'block';
-                    tooltip.innerHTML = `<strong>${obj.userData.name}</strong><br>${obj.userData.desc}`;
+                    tooltip.innerHTML = `<span>[${obj.userData.category}]</span><br><strong>${obj.userData.name}</strong> — ${obj.userData.desc}`;
                 }
             } else {
                 resetHovered();
@@ -347,34 +533,39 @@
             if (hoveredObject) {
                 document.body.style.cursor = 'default';
                 hoveredObject.position.copy(hoveredObject.userData.originalPos);
-                hoveredObject.rotation.copy(hoveredObject.userData.originalRot);
+                hoveredObject.scale.set(1, 1, 1);
                 hoveredObject = null;
                 tooltip.style.display = 'none';
             }
         }
 
-        function onMouseClick(event) {
+        function onMouseClick() {
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(clickableObjects);
 
             if (intersects.length > 0) {
-                const targetUrl = intersects[0].object.userData.url;
-                window.open(targetUrl, '_blank');
+                window.open(intersects[0].object.userData.url, '_blank');
             }
         }
 
         window.addEventListener('mousemove', onMouseMove, false);
         window.addEventListener('click', onMouseClick, false);
 
-        // --- 7. REDIMENSIONAMENTO E LOOP DE RENDERIZAÇÃO ---
+        // Redimensionamento responsivo
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
+        // Loop de Renderização
         function animate() {
             requestAnimationFrame(animate);
+
+            // Animação suave da poeira flutuante
+            particles.rotation.y += 0.0005;
+            particles.rotation.x += 0.0002;
+
             controls.update();
             renderer.render(scene, camera);
         }
