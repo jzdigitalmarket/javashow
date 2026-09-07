@@ -3,574 +3,472 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compêndio Digital 1946 - Mural Gráfico 3D</title>
+    <title>Guia de 50 Ferramentas e Sites Úteis (1946)</title>
+    
+    <!-- Tipografia Retro via Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Special+Elite&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
+
     <style>
+        :root {
+            --bg-paper: #e7d8c2;
+            --bg-card: #ebdcc9;
+            --border-dark: #221811;
+            --accent-red: #8c281a;
+            --accent-navy: #1b2a3a;
+            --text-dark: #1f1610;
+            --gold-accent: #c49a37;
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
-        body, html {
+
+        body {
+            background-color: #120c08;
+            font-family: 'Special Elite', 'Courier New', monospace;
+            color: var(--text-dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px 10px;
+        }
+
+        /* Container Principal do Cartaz */
+        .poster {
+            background-color: var(--bg-paper);
+            background-image: radial-gradient(circle at center, #eedfcb 0%, #decbaf 100%);
             width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #0b0806;
-            font-family: 'Courier New', Courier, monospace;
+            max-width: 1100px;
+            border: 12px solid var(--border-dark);
+            outline: 3px solid var(--gold-accent);
+            padding: 24px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8);
+            position: relative;
         }
-        #webgl-container {
-            width: 100vw;
-            height: 100vh;
-            display: block;
-        }
-        /* Moldura de Periódico Antigo */
-        .vintage-frame {
+
+        /* Moldura de Canto Art Déco */
+        .poster::before {
+            content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: 12px solid #1f140a;
-            box-sizing: border-box;
+            top: 6px; left: 6px; right: 6px; bottom: 6px;
+            border: 2px solid var(--border-dark);
             pointer-events: none;
-            z-index: 5;
-            box-shadow: inset 0 0 80px rgba(0,0,0,0.9);
         }
-        #ui-header {
-            position: absolute;
-            top: 25px;
-            left: 50%;
-            transform: translateX(-50%);
+
+        /* Cabeçalho do Cartaz */
+        header {
             text-align: center;
-            color: #f4e3c1;
-            pointer-events: none;
-            z-index: 10;
-            width: 90%;
-            max-width: 800px;
+            margin-bottom: 24px;
         }
-        #ui-header h1 {
-            font-size: 2rem;
+
+        .top-banner {
+            background-color: var(--accent-red);
+            color: #f4e8d3;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.1rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            padding: 6px 12px;
+            display: inline-block;
+            border: 2px solid var(--border-dark);
+            margin-bottom: 8px;
+        }
+
+        h1.main-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2rem, 5vw, 3.8rem);
+            color: var(--accent-red);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            line-height: 0.95;
+            text-shadow: 2px 2px 0px #edd8bd, 4px 4px 0px var(--border-dark);
+            margin-bottom: 10px;
+        }
+
+        .sub-banner {
+            background-color: var(--accent-navy);
+            color: #f4e8d3;
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(1rem, 2.5vw, 1.6rem);
             letter-spacing: 4px;
             text-transform: uppercase;
-            color: #f7e1b5;
-            text-shadow: 3px 3px 0px #4a2e12, -1px -1px 0px #000;
-            border-bottom: 3px double #c39233;
+            padding: 8px 16px;
+            border: 2px solid var(--border-dark);
+        }
+
+        /* Grid da Lista de Ferramentas */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        /* Categoria/Bloco */
+        .category-card {
+            background-color: var(--bg-card);
+            border: 3px solid var(--border-dark);
+            padding: 16px;
+            position: relative;
+            box-shadow: 4px 4px 0px var(--border-dark);
+        }
+
+        .category-header {
+            background-color: var(--accent-red);
+            color: #f4e8d3;
+            border: 2px solid var(--border-dark);
+            padding: 8px 12px;
+            margin-top: -26px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .category-number {
+            background-color: var(--accent-navy);
+            color: #fff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.2rem;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #fff;
+            flex-shrink: 0;
+        }
+
+        .category-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.15rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            line-height: 1.1;
+        }
+
+        /* Lista de Links */
+        .tool-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .tool-item {
+            border-bottom: 1px dashed var(--border-dark);
             padding-bottom: 8px;
-            margin-bottom: 6px;
         }
-        #ui-header p {
-            font-size: 0.95rem;
-            color: #d1b480;
-            background: rgba(20, 12, 6, 0.85);
+
+        .tool-item:last-child {
+            border-bottom: none;
+        }
+
+        .tool-link {
+            font-family: 'Courier Prime', monospace;
+            font-weight: 700;
+            color: var(--accent-navy);
+            text-decoration: none;
+            font-size: 1.05rem;
             display: inline-block;
-            padding: 4px 16px;
-            border: 1px solid #c39233;
+            background-color: #dccab0;
+            padding: 2px 8px;
+            border: 1px solid var(--border-dark);
             border-radius: 2px;
+            transition: all 0.15s ease;
         }
-        #tooltip {
-            position: absolute;
-            bottom: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #211309;
-            border: 2px solid #c39233;
-            color: #f7e1b5;
-            padding: 12px 24px;
-            font-size: 1rem;
-            pointer-events: none;
-            display: none;
-            z-index: 10;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+
+        .tool-link:hover {
+            background-color: var(--accent-red);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 2px 2px 0px var(--border-dark);
+        }
+
+        .tool-desc {
+            font-size: 0.85rem;
+            color: var(--text-dark);
+            margin-top: 4px;
+            line-height: 1.2;
+        }
+
+        /* Rodapé do Cartaz */
+        footer {
+            margin-top: 30px;
             text-align: center;
-            max-width: 500px;
         }
-        #tooltip span {
-            color: #8c2d19;
-            font-weight: bold;
+
+        .bottom-banner {
+            background-color: var(--accent-red);
+            color: #f4e8d3;
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(1.2rem, 3vw, 2.2rem);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            padding: 10px 15px;
+            border: 3px solid var(--border-dark);
+            box-shadow: 4px 4px 0px var(--border-dark);
+        }
+
+        .footer-sub {
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            margin-top: 8px;
+            text-transform: uppercase;
+            color: #523b28;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .poster {
+                padding: 12px;
+            }
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
 
-    <div class="vintage-frame"></div>
-    <div id="ui-header">
-        <h1>GUIA DE 50 FERRAMENTAS E SITES ÚTEIS</h1>
-        <p>✦ O COMPÊNDIO ESSENCIAL DO CIDADÃO CONECTADO (1946) ✦</p>
-    </div>
+    <main class="poster">
+        <header>
+            <div class="top-banner">Uma Publicação para o Fortalecimento Digital!</div>
+            <h1 class="main-title">Guia de 50 Ferramentas<br>e Sites Úteis</h1>
+            <div class="sub-banner">O Compêndio Essencial do Cidadão Conectado</div>
+        </header>
+
+        <section class="grid-container">
+
+            <!-- Categoria 1 -->
+            <article class="category-card">
+                <div class="category-header">
+                    <span class="category-number">1</span>
+                    <h2 class="category-title">Artigos, Livros e Aprendizado</h2>
+                </div>
+                <ul class="tool-list">
+                    <li class="tool-item">
+                        <a href="https://12ft.io" target="_blank" class="tool-link">12ft.io</a>
+                        <p class="tool-desc">Burlar paywalls de notícias e artigos.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://libgen.is" target="_blank" class="tool-link">libgen.is</a>
+                        <p class="tool-desc">Download gratuito de livros didáticos e acadêmicos.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://sci-hub.se" target="_blank" class="tool-link">sci-hub.se</a>
+                        <p class="tool-desc">Acesso a artigos científicos.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://gutenberg.org" target="_blank" class="tool-link">gutenberg.org</a>
+                        <p class="tool-desc">Biblioteca de e-books clássicos e de domínio público.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://pdfdrive.com" target="_blank" class="tool-link">pdfdrive.com</a>
+                        <p class="tool-desc">Motor de busca e download de livros em PDF.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://openculture.com" target="_blank" class="tool-link">openculture.com</a>
+                        <p class="tool-desc">Cursos gratuitos de universidades globais.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://wolframalpha.com" target="_blank" class="tool-link">wolframalpha.com</a>
+                        <p class="tool-desc">Conhecimento computacional e resolução matemática.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://connectedpapers.com" target="_blank" class="tool-link">connectedpapers.com</a>
+                        <p class="tool-desc">Mapeamento visual de redes de artigos acadêmicos.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://semanticscholar.org" target="_blank" class="tool-link">semanticscholar.org</a>
+                        <p class="tool-desc">Busca acadêmica baseada em Inteligência Artificial.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://scispace.com" target="_blank" class="tool-link">scispace.com</a>
+                        <p class="tool-desc">Leitura e interpretação simplificada de artigos.</p>
+                    </li>
+                </ul>
+            </article>
+
+            <!-- Categoria 2 -->
+            <article class="category-card">
+                <div class="category-header">
+                    <span class="category-number">2</span>
+                    <h2 class="category-title">Edição de Imagem, Design e Vídeo</h2>
+                </div>
+                <ul class="tool-list">
+                    <li class="tool-item">
+                        <a href="https://photopea.com" target="_blank" class="tool-link">photopea.com</a>
+                        <p class="tool-desc">Editor de fotos completo (estilo Photoshop) no navegador.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://squoosh.app" target="_blank" class="tool-link">squoosh.app</a>
+                        <p class="tool-desc">Compressão e otimização de imagens sem perda.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://ezgif.com" target="_blank" class="tool-link">ezgif.com</a>
+                        <p class="tool-desc">Criação e edição de GIFs e imagens animadas.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://remove.bg" target="_blank" class="tool-link">remove.bg</a>
+                        <p class="tool-desc">Remoção automática de fundo de fotos.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://unscreen.com" target="_blank" class="tool-link">unscreen.com</a>
+                        <p class="tool-desc">Remoção automática de fundo de vídeos.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://cleanup.picture" target="_blank" class="tool-link">cleanup.picture</a>
+                        <p class="tool-desc">Remoção de objetos ou texto indesejados em fotos.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://shots.so" target="_blank" class="tool-link">shots.so / smartmockups.com</a>
+                        <p class="tool-desc">Geradores de mockups de telas e produtos.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://tineye.com" target="_blank" class="tool-link">tineye.com</a>
+                        <p class="tool-desc">Busca reversa de imagens na internet.</p>
+                    </li>
+                </ul>
+            </article>
+
+            <!-- Categoria 3 -->
+            <article class="category-card">
+                <div class="category-header">
+                    <span class="category-number">3</span>
+                    <h2 class="category-title">Segurança, Privacidade e Utilitários</h2>
+                </div>
+                <ul class="tool-list">
+                    <li class="tool-item">
+                        <a href="https://haveibeenpwned.com" target="_blank" class="tool-link">haveibeenpwned.com</a>
+                        <p class="tool-desc">Verificação de vazamento de senhas e e-mails.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://virustotal.com" target="_blank" class="tool-link">virustotal.com</a>
+                        <p class="tool-desc">Análise de arquivos e URLs em busca de malwares.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://privnote.com" target="_blank" class="tool-link">privnote.com</a>
+                        <p class="tool-desc">Notas criptografadas que se destroem após lidas.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://temp-mail.org" target="_blank" class="tool-link">temp-mail.org / 10minutemail.com</a>
+                        <p class="tool-desc">Geradores de e-mails temporários e descartáveis.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://file.io" target="_blank" class="tool-link">file.io</a>
+                        <p class="tool-desc">Compartilhamento com exclusão automática pós-download.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://archive.org" target="_blank" class="tool-link">archive.org / archive.ph</a>
+                        <p class="tool-desc">Preservação e consulta de versões antigas de sites.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://downdetector.com" target="_blank" class="tool-link">downdetector.com</a>
+                        <p class="tool-desc">Checagem de instabilidade e queda de serviços.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://fast.com" target="_blank" class="tool-link">fast.com</a>
+                        <p class="tool-desc">Teste simples de velocidade de conexão.</p>
+                    </li>
+                </ul>
+            </article>
+
+            <!-- Categoria 4 -->
+            <article class="category-card">
+                <div class="category-header">
+                    <span class="category-number">4</span>
+                    <h2 class="category-title">Desenvolvimento e Programação</h2>
+                </div>
+                <ul class="tool-list">
+                    <li class="tool-item">
+                        <a href="https://alternativeto.net" target="_blank" class="tool-link">alternativeto.net</a>
+                        <p class="tool-desc">Busca de alternativas gratuitas ou open-source.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://phind.com" target="_blank" class="tool-link">phind.com</a>
+                        <p class="tool-desc">Motor de busca focado em auxílio a desenvolvedores.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://regex101.com" target="_blank" class="tool-link">regex101.com</a>
+                        <p class="tool-desc">Validação e teste de Expressões Regulares (Regex).</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://codebeautify.org" target="_blank" class="tool-link">codebeautify.org / jsonformatter.org</a>
+                        <p class="tool-desc">Formatação e visualização limpa de código e JSON.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://explainshell.com" target="_blank" class="tool-link">explainshell.com</a>
+                        <p class="tool-desc">Explicação detalhada de linhas de comando do terminal.</p>
+                    </li>
+                </ul>
+            </article>
+
+            <!-- Categoria 5 -->
+            <article class="category-card">
+                <div class="category-header">
+                    <span class="category-number">5</span>
+                    <h2 class="category-title">Áudio, Mídia e Foco</h2>
+                </div>
+                <ul class="tool-list">
+                    <li class="tool-item">
+                        <a href="https://justwatch.com" target="_blank" class="tool-link">justwatch.com</a>
+                        <p class="tool-desc">Guia de onde assistir a filmes e séries em streaming.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://radio.garden" target="_blank" class="tool-link">radio.garden</a>
+                        <p class="tool-desc">Rádios ao vivo do mundo todo através de um globo 3D.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://everynoise.com" target="_blank" class="tool-link">everynoise.com</a>
+                        <p class="tool-desc">Mapeamento interativo de gêneros musicais.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://tunefind.com" target="_blank" class="tool-link">tunefind.com</a>
+                        <p class="tool-desc">Identificação de músicas de filmes, séries e jogos.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://musicforprogramming.net" target="_blank" class="tool-link">musicforprogramming.net</a>
+                        <p class="tool-desc">Geradores de áudio focado para trabalho e estudo.</p>
+                    </li>
+                </ul>
+            </article>
+
+            <!-- Categoria 6 -->
+            <article class="category-card">
+                <div class="category-header">
+                    <span class="category-number">6</span>
+                    <h2 class="category-title">PDFs, Resumos e Organização</h2>
+                </div>
+                <ul class="tool-list">
+                    <li class="tool-item">
+                        <a href="https://summarize.tech" target="_blank" class="tool-link">summarize.tech</a>
+                        <p class="tool-desc">Resumo por Inteligência Artificial de vídeos do YouTube.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://raindrop.io" target="_blank" class="tool-link">raindrop.io</a>
+                        <p class="tool-desc">Gerenciador de favoritos e links.</p>
+                    </li>
+                    <li class="tool-item">
+                        <a href="https://smallpdf.com" target="_blank" class="tool-link">smallpdf.com / ilovepdf.com</a>
+                        <p class="tool-desc">Ferramentas para juntar, dividir, converter e editar PDFs.</p>
+                    </li>
+                </ul>
+            </article>
+
+        </section>
+
+        <footer>
+            <div class="bottom-banner">Aumente sua Produtividade e Sabedoria!</div>
+            <p class="footer-sub">Serviço Nacional de Ferramentas Digitais — Publicação 1946</p>
+        </footer>
+    </main>
 
-    <div id="tooltip"></div>
-    <div id="webgl-container"></div>
-
-    <!-- Three.js e OrbitControls -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-
-    <script>
-        // --- 1. ESTRUTURA DE DADOS ---
-        const database = [
-            {
-                category: "1. ARTIGOS & LIVROS",
-                iconType: "book",
-                items: [
-                    { name: "12ft.io", desc: "Burlar paywalls de notícias e artigos", url: "https://12ft.io" },
-                    { name: "libgen.is", desc: "Download gratuito de livros acadêmicos", url: "https://libgen.is" },
-                    { name: "sci-hub.se", desc: "Acesso a artigos científicos", url: "https://sci-hub.se" },
-                    { name: "gutenberg.org", desc: "Biblioteca de e-books de domínio público", url: "https://gutenberg.org" },
-                    { name: "pdfdrive.com", desc: "Motor de busca de livros em PDF", url: "https://pdfdrive.com" },
-                    { name: "openculture.com", desc: "Cursos gratuitos de universidades", url: "https://openculture.com" },
-                    { name: "wolframalpha.com", desc: "Conhecimento computacional e matemática", url: "https://wolframalpha.com" },
-                    { name: "connectedpapers.com", desc: "Mapeamento visual de artigos acadêmicos", url: "https://connectedpapers.com" },
-                    { name: "semanticscholar.org", desc: "Busca acadêmica baseada em IA", url: "https://semanticscholar.org" },
-                    { name: "scispace.com", desc: "Leitura e interpretação de artigos", url: "https://typeset.io" }
-                ]
-            },
-            {
-                category: "2. DESIGN & VÍDEO",
-                iconType: "media",
-                items: [
-                    { name: "photopea.com", desc: "Editor de fotos completo (Photoshop web)", url: "https://photopea.com" },
-                    { name: "squoosh.app", desc: "Compressão e otimização de imagens", url: "https://squoosh.app" },
-                    { name: "ezgif.com", desc: "Criação e edição de GIFs animados", url: "https://ezgif.com" },
-                    { name: "remove.bg", desc: "Remoção automática de fundo de fotos", url: "https://remove.bg" },
-                    { name: "unscreen.com", desc: "Remoção automática de fundo de vídeos", url: "https://unscreen.com" },
-                    { name: "cleanup.picture", desc: "Remoção de objetos indesejados em fotos", url: "https://cleanup.picture" },
-                    { name: "shots.so", desc: "Gerador de mockups de telas e produtos", url: "https://shots.so" },
-                    { name: "tineye.com", desc: "Busca reversa de imagens", url: "https://tineye.com" }
-                ]
-            },
-            {
-                category: "3. SEGURANÇA & PRIVACIDADE",
-                iconType: "security",
-                items: [
-                    { name: "haveibeenpwned.com", desc: "Verificação de vazamento de senhas", url: "https://haveibeenpwned.com" },
-                    { name: "virustotal.com", desc: "Análise de arquivos contra malwares", url: "https://virustotal.com" },
-                    { name: "privnote.com", desc: "Notas salvas criptografadas autodestrutivas", url: "https://privnote.com" },
-                    { name: "temp-mail.org", desc: "Gerador de e-mails descartáveis", url: "https://temp-mail.org" },
-                    { name: "file.io", desc: "Compartilhamento com exclusão automática", url: "https://file.io" },
-                    { name: "archive.org", desc: "Preservação de histórico de sites", url: "https://archive.org" },
-                    { name: "downdetector.com", desc: "Checagem de instabilidade de serviços", url: "https://downdetector.com" },
-                    { name: "fast.com", desc: "Teste rápido de velocidade de internet", url: "https://fast.com" }
-                ]
-            },
-            {
-                category: "4. DESENVOLVIMENTO",
-                iconType: "code",
-                items: [
-                    { name: "alternativeto.net", desc: "Busca de alternativas gratuitas de software", url: "https://alternativeto.net" },
-                    { name: "phind.com", desc: "Motor de busca com IA para desenvolvedores", url: "https://phind.com" },
-                    { name: "regex101.com", desc: "Validação e teste de Regex", url: "https://regex101.com" },
-                    { name: "codebeautify.org", desc: "Formatação limpa de código e JSON", url: "https://codebeautify.org" },
-                    { name: "explainshell.com", desc: "Explicação detalhada de comandos terminal", url: "https://explainshell.com" }
-                ]
-            },
-            {
-                category: "5. ÁUDIO & RÁDIO",
-                iconType: "audio",
-                items: [
-                    { name: "justwatch.com", desc: "Guia de onde assistir filmes e séries", url: "https://justwatch.com" },
-                    { name: "radio.garden", desc: "Rádios ao vivo do mundo em globo 3D", url: "https://radio.garden" },
-                    { name: "everynoise.com", desc: "Mapeamento de milhares de gêneros musicais", url: "https://everynoise.com" },
-                    { name: "tunefind.com", desc: "Músicas de filmes, séries e jogos", url: "https://tunefind.com" },
-                    { name: "musicforprogramming.net", desc: "Áudio ambiente para foco e estudo", url: "https://musicforprogramming.net" }
-                ]
-            },
-            {
-                category: "6. PDF & ORGANIZAÇÃO",
-                iconType: "pdf",
-                items: [
-                    { name: "summarize.tech", desc: "Resumos por IA de vídeos do YouTube", url: "https://summarize.tech" },
-                    { name: "raindrop.io", desc: "Gerenciador de favoritos e links", url: "https://raindrop.io" },
-                    { name: "smallpdf.com", desc: "Ferramentas para converter e editar PDFs", url: "https://smallpdf.com" },
-                    { name: "ilovepdf.com", desc: "Juntar, dividir e comprimir PDFs", url: "https://ilovepdf.com" }
-                ]
-            }
-        ];
-
-        // --- 2. CENA & ILUMINAÇÃO THREE.JS ---
-        const container = document.getElementById('webgl-container');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0e0a07);
-        scene.fog = new THREE.FogExp2(0x0e0a07, 0.012);
-
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 5, 52);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        container.appendChild(renderer.domElement);
-
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI / 2 - 0.02;
-        controls.minDistance = 15;
-        controls.maxDistance = 85;
-
-        // Luzes Retro Quentes
-        const ambientLight = new THREE.AmbientLight(0xffdfb3, 0.7);
-        scene.add(ambientLight);
-
-        const mainSpot = new THREE.SpotLight(0xffcd85, 1.8);
-        mainSpot.position.set(0, 45, 35);
-        mainSpot.angle = Math.PI / 3;
-        mainSpot.penumbra = 0.5;
-        mainSpot.castShadow = true;
-        mainSpot.shadow.mapSize.width = 2048;
-        mainSpot.shadow.mapSize.height = 2048;
-        scene.add(mainSpot);
-
-        const sideLight = new THREE.PointLight(0xb54025, 1.2, 60);
-        sideLight.position.set(-30, -10, 15);
-        scene.add(sideLight);
-
-        // --- 3. GERADORES DE TEXTURAS GRÁFICAS PROCEDURAIS (CANVAS 2D) ---
-
-        // Função para desenhar ícones vintage retro
-        function drawRetroIcon(ctx, type, x, y, size) {
-            ctx.save();
-            ctx.strokeStyle = '#3a2212';
-            ctx.fillStyle = '#3a2212';
-            ctx.lineWidth = 3;
-
-            if (type === 'book') {
-                ctx.strokeRect(x - size/2, y - size/2, size, size*0.8);
-                ctx.beginPath();
-                ctx.moveTo(x, y - size/2);
-                ctx.lineTo(x, y + size*0.3);
-                ctx.stroke();
-            } else if (type === 'media') {
-                ctx.beginPath();
-                ctx.arc(x, y, size*0.4, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.fillRect(x - size*0.15, y - size*0.15, size*0.3, size*0.3);
-            } else if (type === 'security') {
-                ctx.beginPath();
-                ctx.moveTo(x, y - size*0.5);
-                ctx.lineTo(x + size*0.4, y - size*0.3);
-                ctx.lineTo(x + size*0.4, y + size*0.2);
-                ctx.lineTo(x, y + size*0.5);
-                ctx.lineTo(x - size*0.4, y + size*0.2);
-                ctx.lineTo(x - size*0.4, y - size*0.3);
-                ctx.closePath();
-                ctx.stroke();
-            } else if (type === 'code') {
-                ctx.font = 'bold 22px "Courier New"';
-                ctx.textAlign = 'center';
-                ctx.fillText('</>', x, y + 7);
-            } else if (type === 'audio') {
-                ctx.beginPath();
-                ctx.arc(x - 8, y + 5, 6, 0, Math.PI * 2);
-                ctx.arc(x + 8, y + 2, 6, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillRect(x - 3, y - 12, 4, 16);
-                ctx.fillRect(x + 13, y - 15, 4, 16);
-            } else {
-                ctx.strokeRect(x - size*0.35, y - size*0.4, size*0.7, size*0.8);
-                ctx.beginPath();
-                ctx.moveTo(x - size*0.2, y - size*0.1);
-                ctx.lineTo(x + size*0.2, y - size*0.1);
-                ctx.stroke();
-            }
-            ctx.restore();
-        }
-
-        // Fundo do Mural Vintage Grandes Proporções
-        function createBoardTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 2048;
-            canvas.height = 1024;
-            const ctx = canvas.getContext('2d');
-
-            // Papel envelhecido escuro
-            ctx.fillStyle = '#26190f';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Linhas de borda / Vinco de Impressão Art Déco
-            ctx.strokeStyle = '#523720';
-            ctx.lineWidth = 12;
-            ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
-
-            ctx.lineWidth = 4;
-            ctx.strokeRect(48, 48, canvas.width - 96, canvas.height - 96);
-
-            // Textura de ruído de papel
-            for (let i = 0; i < 15000; i++) {
-                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.05)';
-                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 3, 3);
-            }
-
-            // Rodapé do Mural
-            ctx.fillStyle = '#8c2d19';
-            ctx.fillRect(50, canvas.height - 110, canvas.width - 100, 50);
-            
-            ctx.fillStyle = '#f4e3c1';
-            ctx.font = 'bold 26px "Courier New"';
-            ctx.textAlign = 'center';
-            ctx.fillText('AUMENTE SUA PRODUTIVIDADE E SABEDORIA! • IMPRESSO EM 1946', canvas.width / 2, canvas.height - 75);
-
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        // Placa do Cabeçalho de Categoria
-        function createCategoryHeaderTexture(title, iconType, num) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 160;
-            const ctx = canvas.getContext('2d');
-
-            // Fundo da fita vintage
-            ctx.fillStyle = '#eddac2';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Moldura externa dupla
-            ctx.strokeStyle = '#3a2212';
-            ctx.lineWidth = 6;
-            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-
-            ctx.lineWidth = 2;
-            ctx.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
-
-            // Selo / Círculo numérico vermelho
-            ctx.fillStyle = '#8c2d19';
-            ctx.beginPath();
-            ctx.arc(60, canvas.height / 2, 32, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = '#f4e3c1';
-            ctx.font = 'bold 24px "Courier New"';
-            ctx.textAlign = 'center';
-            ctx.fillText('0' + num, 60, canvas.height / 2 + 8);
-
-            // Desenhar Ícone da Categoria
-            drawRetroIcon(ctx, iconType, 440, canvas.height / 2, 36);
-
-            // Título
-            ctx.fillStyle = '#26150a';
-            ctx.font = 'bold 21px "Courier New"';
-            ctx.textAlign = 'left';
-            ctx.fillText(title.substring(3), 110, 92);
-
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        // Cartão Individual da Ferramenta
-        function createItemCardTexture(name, desc) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 400;
-            canvas.height = 220;
-            const ctx = canvas.getContext('2d');
-
-            // Papel creme antigo
-            ctx.fillStyle = '#f2e6d3';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Bordas e Hachuras
-            ctx.strokeStyle = '#3a2212';
-            ctx.lineWidth = 4;
-            ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
-
-            ctx.lineWidth = 1;
-            ctx.strokeRect(14, 14, canvas.width - 28, canvas.height - 28);
-
-            // Faixa superior do nome
-            ctx.fillStyle = '#3a2212';
-            ctx.fillRect(16, 16, canvas.width - 32, 42);
-
-            ctx.fillStyle = '#f2e6d3';
-            ctx.font = 'bold 18px "Courier New"';
-            ctx.textAlign = 'center';
-            ctx.fillText(name, canvas.width / 2, 43);
-
-            // Descrição (Texto com Quebra)
-            ctx.fillStyle = '#1c1007';
-            ctx.font = '14px "Courier New"';
-            ctx.textAlign = 'center';
-
-            const words = desc.split(' ');
-            let line = '';
-            let y = 95;
-
-            for (let n = 0; n < words.length; n++) {
-                let testLine = line + words[n] + ' ';
-                if (ctx.measureText(testLine).width > 340 && n > 0) {
-                    ctx.fillText(line, canvas.width / 2, y);
-                    line = words[n] + ' ';
-                    y += 22;
-                } else {
-                    line = testLine;
-                }
-            }
-            ctx.fillText(line, canvas.width / 2, y);
-
-            // Carimbo vermelho retro de acionamento
-            ctx.strokeStyle = '#8c2d19';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(canvas.width / 2 - 60, 165, 120, 32);
-
-            ctx.fillStyle = '#8c2d19';
-            ctx.font = 'bold 13px "Courier New"';
-            ctx.fillText('► ACESSAR ◄', canvas.width / 2, 186);
-
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        // --- 4. MONTAGEM DO MURAL 3D ---
-
-        // Prancha de Fundo
-        const boardGeo = new THREE.PlaneGeometry(85, 45);
-        const boardMat = new THREE.MeshStandardMaterial({
-            map: createBoardTexture(),
-            roughness: 0.85,
-            metalness: 0.1
-        });
-        const boardMesh = new THREE.Mesh(boardGeo, boardMat);
-        boardMesh.position.z = -2;
-        boardMesh.receiveShadow = true;
-        scene.add(boardMesh);
-
-        const clickableObjects = [];
-        const numCols = database.length;
-        const colSpacing = 13.5;
-
-        database.forEach((cat, colIdx) => {
-            const xPos = (colIdx - (numCols - 1) / 2) * colSpacing;
-
-            // 1. Criar Placa de Cabeçalho da Categoria
-            const headerGeo = new THREE.PlaneGeometry(12, 3.8);
-            const headerMat = new THREE.MeshStandardMaterial({
-                map: createCategoryHeaderTexture(cat.category, cat.iconType, colIdx + 1),
-                roughness: 0.5
-            });
-            const headerMesh = new THREE.Mesh(headerGeo, headerMat);
-            headerMesh.position.set(xPos, 17, 0);
-            headerMesh.castShadow = true;
-            scene.add(headerMesh);
-
-            // 2. Criar Fichas de Cada Ferramenta
-            cat.items.forEach((item, rowIdx) => {
-                const cardGeo = new THREE.BoxGeometry(11.5, 3.2, 0.2);
-                const texture = createItemCardTexture(item.name, item.desc);
-
-                const materials = [
-                    new THREE.MeshStandardMaterial({ color: 0x2b1a0e }),
-                    new THREE.MeshStandardMaterial({ color: 0x2b1a0e }),
-                    new THREE.MeshStandardMaterial({ color: 0x2b1a0e }),
-                    new THREE.MeshStandardMaterial({ color: 0x2b1a0e }),
-                    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.6 }), // Frente
-                    new THREE.MeshStandardMaterial({ color: 0x3d2717 })  // Trás
-                ];
-
-                const card = new THREE.Mesh(cardGeo, materials);
-                const yPos = 12.5 - (rowIdx * 3.6);
-
-                card.position.set(xPos, yPos, 0.2);
-                card.castShadow = true;
-                card.receiveShadow = true;
-
-                card.userData = {
-                    name: item.name,
-                    desc: item.desc,
-                    url: item.url,
-                    category: cat.category,
-                    originalPos: card.position.clone()
-                };
-
-                scene.add(card);
-                clickableObjects.push(card);
-            });
-        });
-
-        // Partículas de poeira vintage flutuantes no ar
-        const particleGeo = new THREE.BufferGeometry();
-        const count = 300;
-        const positions = new Float32Array(count * 3);
-        for(let i=0; i<count*3; i+=3) {
-            positions[i] = (Math.random() - 0.5) * 100;
-            positions[i+1] = (Math.random() - 0.5) * 60;
-            positions[i+2] = Math.random() * 40;
-        }
-        particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const particleMat = new THREE.PointsMaterial({ size: 0.25, color: 0xffd89e, transparent: true, opacity: 0.4 });
-        const particles = new THREE.Points(particleGeo, particleMat);
-        scene.add(particles);
-
-        // --- 5. INTERAÇÃO E RAYCASTING ---
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        const tooltip = document.getElementById('tooltip');
-        let hoveredObject = null;
-
-        function onMouseMove(event) {
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(clickableObjects);
-
-            if (intersects.length > 0) {
-                const obj = intersects[0].object;
-
-                if (hoveredObject !== obj) {
-                    resetHovered();
-                    hoveredObject = obj;
-                    
-                    document.body.style.cursor = 'pointer';
-                    // Efeito 3D ao passar o mouse: Cartão salta do mural
-                    obj.position.z = 2.2;
-                    obj.scale.set(1.06, 1.06, 1.06);
-
-                    tooltip.style.display = 'block';
-                    tooltip.innerHTML = `<span>[${obj.userData.category}]</span><br><strong>${obj.userData.name}</strong> — ${obj.userData.desc}`;
-                }
-            } else {
-                resetHovered();
-            }
-        }
-
-        function resetHovered() {
-            if (hoveredObject) {
-                document.body.style.cursor = 'default';
-                hoveredObject.position.copy(hoveredObject.userData.originalPos);
-                hoveredObject.scale.set(1, 1, 1);
-                hoveredObject = null;
-                tooltip.style.display = 'none';
-            }
-        }
-
-        function onMouseClick() {
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(clickableObjects);
-
-            if (intersects.length > 0) {
-                window.open(intersects[0].object.userData.url, '_blank');
-            }
-        }
-
-        window.addEventListener('mousemove', onMouseMove, false);
-        window.addEventListener('click', onMouseClick, false);
-
-        // Redimensionamento responsivo
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        // Loop de Renderização
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // Animação suave da poeira flutuante
-            particles.rotation.y += 0.0005;
-            particles.rotation.x += 0.0002;
-
-            controls.update();
-            renderer.render(scene, camera);
-        }
-
-        animate();
-    </script>
 </body>
 </html>
