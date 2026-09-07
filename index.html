@@ -1,4 +1,222 @@
-<video class="video-background" autoplay muted loop playsinline>
-    <source src="video/background-720p.webm" type="video/webm">
-    <source src="video/background-720p.mp4" type="video/mp4">
-</video>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Video Background</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #ffffff;
+      min-height: 100vh;
+      background-color: #0d0d0d;
+      overflow-x: hidden;
+    }
+
+    /* Container dos vídeos de fundo */
+    .video-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      z-index: -1;
+      background-color: #000000;
+    }
+
+    /* Estilo base para os dois elementos de vídeo */
+    .video-background video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      transition: opacity 0.6s ease-in-out; /* Transição suave entre os vídeos */
+      will-change: opacity;
+    }
+
+    /* Camada 1: Vídeo principal em loop (16.8s) */
+    #bg-main {
+      opacity: 1;
+      z-index: 1;
+    }
+
+    /* Camada 2: Vídeo de destaque de curta duração (2.23s) */
+    #bg-accent {
+      opacity: 0;
+      z-index: 2;
+    }
+
+    /* Filtro escuro para legibilidade do texto sobreposto */
+    .video-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* Interface do Usuário */
+    .content-container {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 2.5rem;
+      max-width: 500px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #e0e0e0;
+      margin-bottom: 1.5rem;
+    }
+
+    .trigger-btn {
+      background: #ffffff;
+      color: #0d0d0d;
+      border: none;
+      padding: 0.8rem 1.8rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+
+    .trigger-btn:hover {
+      background: #e2e2e2;
+    }
+
+    .trigger-btn:active {
+      transform: scale(0.98);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .video-background video {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Camada de Vídeos de Fundo -->
+  <div class="video-background">
+    <!-- Vídeo contínuo de 16.8s (MP4) -->
+    <video id="bg-main" autoplay loop muted playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+      <source src="https://raw.githubusercontent.com/jzdigitalmarket/javashow/main/background-720p.mp4" type="video/mp4">
+    </video>
+
+    <!-- Vídeo acionado por ação do usuário de 2.23s (WebM) -->
+    <video id="bg-accent" muted playsinline preload="auto">
+      <source src="https://raw.githubusercontent.com/jzdigitalmarket/javashow/main/background-720p.webm" type="video/webm">
+    </video>
+
+    <div class="video-overlay"></div>
+  </div>
+
+  <!-- Conteúdo em primeiro plano -->
+  <main class="content-container">
+    <div class="card" id="interactive-card">
+      <h1>Efeito Interativo</h1>
+      <p>Passe o mouse sobre este cartão ou clique no botão abaixo para disparar a animação em vídeo de 2.2 segundos sem cortar o áudio ou causar travamentos.</p>
+      <button class="trigger-btn" id="trigger-action">Ativar Efeito</button>
+    </div>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const bgMain = document.getElementById('bg-main');
+      const bgAccent = document.getElementById('bg-accent');
+      const interactiveCard = document.getElementById('interactive-card');
+      const triggerBtn = document.getElementById('trigger-action');
+
+      let isPlayingAccent = false;
+
+      // Garante que o vídeo secundário esteja pré-carregado na memória
+      bgAccent.load();
+
+      function triggerAccentVideo() {
+        if (isPlayingAccent) return;
+        isPlayingAccent = true;
+
+        // Reinicia o tempo do vídeo rápido
+        bgAccent.currentTime = 0;
+
+        const playPromise = bgAccent.play();
+
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            // Aplica o cross-fade suave via opacidade CSS
+            bgAccent.style.opacity = '1';
+            bgMain.style.opacity = '0';
+          }).catch(error => {
+            console.warn('Bloqueio de reprodução detectado:', error);
+            isPlayingAccent = false;
+          });
+        }
+      }
+
+      // Evento disparado assim que o vídeo de 2.23s chega ao fim
+      bgAccent.addEventListener('ended', () => {
+        // Retorna a opacidade para o vídeo principal em loop
+        bgAccent.style.opacity = '0';
+        bgMain.style.opacity = '1';
+
+        // Aguarda a transição CSS de 0.6s terminar para liberar nova execução
+        setTimeout(() => {
+          isPlayingAccent = false;
+        }, 600);
+      });
+
+      // Gatilhos de interação (Hover no card ou clique no botão)
+      interactiveCard.addEventListener('mouseenter', triggerAccentVideo);
+      triggerBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Evita disparo duplo se estiver sobre o card
+        triggerAccentVideo();
+      });
+    });
+  </script>
+</body>
+</html>
