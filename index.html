@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Video Background</title>
+  <title>Interactive Video Background - Vintage Poster</title>
   <style>
     * {
       margin: 0;
@@ -40,23 +40,21 @@
       height: 100%;
       object-fit: cover;
       object-position: center;
-      transition: opacity 0.6s ease-in-out; /* Transição suave entre os vídeos */
+      transition: opacity 0.6s ease-in-out;
       will-change: opacity;
     }
 
-    /* Camada 1: Vídeo principal em loop (16.8s) */
     #bg-main {
       opacity: 1;
       z-index: 1;
     }
 
-    /* Camada 2: Vídeo de destaque de curta duração (2.23s) */
     #bg-accent {
       opacity: 0;
       z-index: 2;
     }
 
-    /* Filtro escuro para legibilidade do texto sobreposto */
+    /* Filtro escuro para legibilidade do conteúdo */
     .video-overlay {
       position: absolute;
       top: 0;
@@ -68,7 +66,7 @@
       pointer-events: none;
     }
 
-    /* Interface do Usuário */
+    /* Container de alinhamento ao centro */
     .content-container {
       position: relative;
       z-index: 4;
@@ -81,55 +79,26 @@
       text-align: center;
     }
 
-    .card {
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 16px;
-      padding: 2.5rem;
-      max-width: 500px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-      transition: transform 0.3s ease, border-color 0.3s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(255, 255, 255, 0.4);
-    }
-
-    h1 {
-      font-size: 2.2rem;
-      margin-bottom: 1rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-
-    p {
-      font-size: 1rem;
-      line-height: 1.6;
-      color: #e0e0e0;
-      margin-bottom: 1.5rem;
-    }
-
-    .trigger-btn {
-      background: #ffffff;
-      color: #0d0d0d;
-      border: none;
-      padding: 0.8rem 1.8rem;
-      font-size: 0.95rem;
-      font-weight: 600;
-      border-radius: 8px;
+    /* Container do cartaz centralizado */
+    .poster-container {
       cursor: pointer;
-      transition: background-color 0.2s ease, transform 0.1s ease;
+      transition: transform 0.3s ease, filter 0.3s ease;
+      display: inline-block;
     }
 
-    .trigger-btn:hover {
-      background: #e2e2e2;
+    .poster-container:hover {
+      transform: scale(1.02);
     }
 
-    .trigger-btn:active {
-      transform: scale(0.98);
+    .poster-img {
+      max-width: 90vw;
+      max-height: 85vh;
+      width: auto;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      display: block;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -143,12 +112,10 @@
 
   <!-- Camada de Vídeos de Fundo -->
   <div class="video-background">
-    <!-- Vídeo contínuo de 16.8s (MP4) -->
     <video id="bg-main" autoplay loop muted playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
       <source src="https://raw.githubusercontent.com/jzdigitalmarket/javashow/main/background-720p.mp4" type="video/mp4">
     </video>
 
-    <!-- Vídeo acionado por ação do usuário de 2.23s (WebM) -->
     <video id="bg-accent" muted playsinline preload="auto">
       <source src="https://raw.githubusercontent.com/jzdigitalmarket/javashow/main/background-720p.webm" type="video/webm">
     </video>
@@ -156,39 +123,33 @@
     <div class="video-overlay"></div>
   </div>
 
-  <!-- 
+  <!-- Cartaz Centralizado -->
   <main class="content-container">
-    <div class="card" id="interactive-card">
-      <h1>Efeito Interativo</h1>
-      <p>Passe o mouse sobre este cartão ou clique no botão abaixo para disparar a animação em vídeo de 2.2 segundos sem cortar o áudio ou causar travamentos.</p>
-      <button class="trigger-btn" id="trigger-action">Ativar Efeito</button>
+    <div class="poster-container" id="interactive-card">
+      <img src="https://lh3.googleusercontent.com/rd-gg-dl/AAQ_wbHcI0zB_QGl9VTZrNC4YyqMn1b9NWTfsmfGUTmu2fkkkkid9gNqV55sVaXLU0DIH6OuxSF_iW6sGrZINvzHpo8bXZWLNM-SRPlCY11p3uDaKWomojhWTdI6C0_GJQqLWRWlvDWjDjHTjWchkeiTabHNLkTU1heiW3qhSMparrYs7vjS-7rXh5jDpRXB3nqHOJ0fEtBfyZbwcuB2ZgQbn_MuEocr9THmYu4aoE32HyjaPGQAPVAyww5Wi4PcxN6YpNo-uJHozd_8Dp3oUJ5KJe9LOT3iUw7eszbejZrUZt6x9F0TGoHeRfAYbwzRaaWZBWAq6LnGHC-SF3AiYSvA_3f1gkf7xgW8v6emocSNUiLqCCkJy2eMU0wHwGcEsMrT63EegDNVN2jfc2rJV7Uz-BLitXlT4DD6lRl4cmH6Yz3mCaVb8p87aZHSm8Ye70hHwX3fExtOsWO5crqzoIwv6Q0Y5wtkohSpk665qnV7KGoV3WVy-x-zDt1K-4UlMvTNMrVyymiDQF3rNfLARSVvHAP5iTceZM56FXgzn2zc_dS47EcRdMlzja6rnjJPKYhTis-O6a6GtsGVVE3QULa4FSZP4tUUchd4R_AAcWqN3LLivrzKigzqPK7s0ZL42sLziYC77nJz2yOFUd2lWOCc1LdLjenjljoTWUNWBdCFSemN2x4WPw_LSO8rCL93u4jSsWX64M0XPeUfU4-cRNYGqkINJB85K-VXAuD7eWViVt4j1pzZh23zMMOJE8jPcS_1Qs7zUTRnh7QGSIaQGUCSUQm_hvN4hw6vnvNrmofQMr--Zfcf5iTYawNk2BW5RDuyt140bMYkHMtMjVWkk6ZYWYIXKLMGgJ7Crxqobkghdo52zbc3Hlb29EkM3jMMQQWemFgMcwEMlZvKxicWlgW2ZNgfbl6tzOsXPD2oiAkvOoOGWIRJX6w9KtrUOJDM5E8eveGvVceSVEvNykSTQzSYBf21syoc6IxHFah0-NBiJF24NV_aQVSUYsGJ7KqOE5VRPGiqIpDIazgxa1hLtKCRR05vZtJqm1HOWKYOMuxVcseKDAFXZNsdlpTiQ9462Tx1MPWAjZsg8zYEmMz5fPvfawW1VTicQ68Aqyli4QDAgapCuI6_qd89P_1H4vuAMO0IVHtSxJvfoDOGqghZf3eSdMaldTeh-iSbzNXVYgHGBLcry9tNt-CohVx2N9RiUmd72Ln1F1Omv8hbYB5tfn7m36Q6S5wnrighypLsecd5ASJ_m62YQz4DtyVh9tcPNMCRu8L7wA=s1024-rj" alt="Cartaz Vintage Anos 20" class="poster-img">
     </div>
   </main>
--->
+
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const bgMain = document.getElementById('bg-main');
       const bgAccent = document.getElementById('bg-accent');
       const interactiveCard = document.getElementById('interactive-card');
-      const triggerBtn = document.getElementById('trigger-action');
 
       let isPlayingAccent = false;
 
-      // Garante que o vídeo secundário esteja pré-carregado na memória
       bgAccent.load();
 
       function triggerAccentVideo() {
         if (isPlayingAccent) return;
         isPlayingAccent = true;
 
-        // Reinicia o tempo do vídeo rápido
         bgAccent.currentTime = 0;
 
         const playPromise = bgAccent.play();
 
         if (playPromise !== undefined) {
           playPromise.then(() => {
-            // Aplica o cross-fade suave via opacidade CSS
             bgAccent.style.opacity = '1';
             bgMain.style.opacity = '0';
           }).catch(error => {
@@ -198,24 +159,19 @@
         }
       }
 
-      // Evento disparado assim que o vídeo de 2.23s chega ao fim
       bgAccent.addEventListener('ended', () => {
-        // Retorna a opacidade para o vídeo principal em loop
         bgAccent.style.opacity = '0';
         bgMain.style.opacity = '1';
 
-        // Aguarda a transição CSS de 0.6s terminar para liberar nova execução
         setTimeout(() => {
           isPlayingAccent = false;
         }, 600);
       });
 
-      // Gatilhos de interação (Hover no card ou clique no botão)
-      interactiveCard.addEventListener('mouseenter', triggerAccentVideo);
-      triggerBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Evita disparo duplo se estiver sobre o card
-        triggerAccentVideo();
-      });
+      if (interactiveCard) {
+        interactiveCard.addEventListener('mouseenter', triggerAccentVideo);
+        interactiveCard.addEventListener('click', triggerAccentVideo);
+      }
     });
   </script>
 </body>
