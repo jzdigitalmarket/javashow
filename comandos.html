@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Galeria de Imagens</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 2rem;
+    }
+
+    .gallery-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .gallery-title {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2rem;
+    }
+
+    /* Grid responsivo automático */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .gallery-item {
+      overflow: hidden;
+      border-radius: 12px;
+      background-color: #1e293b;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .gallery-item:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 250px;
+      object-fit: cover; /* Evita distorção da imagem */
+      display: block;
+    }
+
+    .gallery-caption {
+      padding: 1rem;
+      font-size: 0.9rem;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+
+  <main class="gallery-container">
+    <h1 class="gallery-title">Minha Galeria</h1>
+    
+    <div class="gallery-grid">
+      <figure class="gallery-item">
+        <img src="https://picsum.photos/600/400?random=1" alt="Imagem 1" loading="lazy">
+        <figcaption class="gallery-caption">Legenda da Imagem 1</figcaption>
+      </figure>
+
+      <figure class="gallery-item">
+        <img src="https://picsum.photos/600/400?random=2" alt="Imagem 2" loading="lazy">
+        <figcaption class="gallery-caption">Legenda da Imagem 2</figcaption>
+      </figure>
+
+      <figure class="gallery-item">
+        <img src="https://picsum.photos/600/400?random=3" alt="Imagem 3" loading="lazy">
+        <figcaption class="gallery-caption">Legenda da Imagem 3</figcaption>
+      </figure>
+
+      <figure class="gallery-item">
+        <img src="https://picsum.photos/600/400?random=4" alt="Imagem 4" loading="lazy">
+        <figcaption class="gallery-caption">Legenda da Imagem 4</figcaption>
+      </figure>
+    </div>
+  </main>
+
+</body>
+</html>
