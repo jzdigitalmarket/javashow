@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JAVASHOW // CORE SYSTEM INDEX</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-magenta: #ff0055;
+            --cyber-blue: #0a192f;
+            --hud-bg: rgba(6, 11, 25, 0.75);
+            --border-glow: rgba(0, 243, 255, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            background-color: #02040a;
+            font-family: 'Share Tech Mono', monospace;
+            color: #e2e8f0;
+        }
+
+        #webgl-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0.3));
+            background-size: 100% 4px;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .hud-overlay {
+            position: relative;
+            z-index: 3;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-glow);
+            margin-bottom: 2.5rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .logo-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 900;
+            letter-spacing: 4px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-title span {
+            color: var(--neon-magenta);
+            text-shadow: 0 0 10px var(--neon-magenta);
+        }
+
+        .system-status {
+            display: flex;
+            gap: 20px;
+            font-size: 0.85rem;
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 243, 255, 0.08);
+            border: 1px solid var(--border-glow);
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--neon-cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--neon-cyan);
+            animation: pulse 1.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.3; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+        }
+
+        .nav-card {
+            background: var(--hud-bg);
+            border: 1px solid var(--border-glow);
+            border-left: 4px solid var(--neon-cyan);
+            border-radius: 6px;
+            padding: 1.25rem;
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(12px);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .nav-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .nav-card:hover::before {
+            left: 100%;
+        }
+
+        .nav-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.25), inset 0 0 15px rgba(0, 243, 255, 0.1);
+        }
+
+        .nav-card.alt-theme {
+            border-left-color: var(--neon-magenta);
+        }
+
+        .nav-card.alt-theme:hover {
+            border-color: var(--neon-magenta);
+            box-shadow: 0 0 25px rgba(255, 0, 85, 0.25), inset 0 0 15px rgba(255, 0, 85, 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .card-id {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 2px;
+        }
+
+        .card-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.5rem;
+            letter-spacing: 1px;
+        }
+
+        .card-desc {
+            font-size: 0.85rem;
+            color: #a0aec0;
+            line-height: 1.4;
+            margin-bottom: 1.25rem;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            border-top: 1px dashed rgba(255, 255, 255, 0.1);
+            padding-top: 0.75rem;
+        }
+
+        .protocol {
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+        }
+
+        .alt-theme .protocol {
+            color: var(--neon-magenta);
+        }
+
+        .execute-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        footer {
+            margin-top: auto;
+            padding-top: 3rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.3);
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="webgl-container"></div>
+    <div class="scanline"></div>
+
+    <div class="hud-overlay">
+        <header>
+            <div class="logo-title">
+                JAVA<span>SHOW</span> // OS
+            </div>
+            <div class="system-status">
+                <div class="status-badge">
+                    <div class="dot"></div>
+                    GRID: ONLINE
+                </div>
+                <div class="status-badge">
+                    HOST: JAVASHOW.PAGES.DEV
+                </div>
+            </div>
+        </header>
+
+        <div class="grid-container">
+            <a href="https://javashow.pages.dev/comandos.html" class="nav-card">
+                <div>
+                    <div class="card-header">
+                        <span class="card-id">// SYS_01</span>
+                        <span class="protocol">HTML5 / GALLERY</span>
+                    </div>
+                    <div class="card-title">comandos.html</div>
+                    <div class="card-desc">Estrutura inicial do sistema para galeria visual e manipulação dinâmica de imagens.</div>
+                </div>
+                <div class="card-footer">
+                    <span>STATUS: ACTIVE</span>
+                    <span class="execute-btn">EXECUTE &gt;</span>
+                </div>
+            </a>
+
+            <a href="https://javashow.pages.dev/comands.html" class="nav-card alt-theme">
+                <div>
+                    <div class="card-header">
+                        <span class="card-id">// SYS_02</span>
+                        <span class="protocol">BACKEND / CLI</span>
+                    </div>
+                    <div class="card-title">comands.html</div>
+                    <div class="card-desc">Módulo de comandos e execução de output impresso do sistema central.</div>
+                </div>
+                <div class="card-footer">
+                    <span>STATUS: ACTIVE</span>
+                    <span class="execute-btn">EXECUTE &gt;</span>
+                </div>
+            </a>
+
+            <a href="https://javashow.pages.dev/guide.html" class="nav-card">
+                <div>
+                    <div class="card-header">
+                        <span class="card-id">// SYS_03</span>
+                        <span class="protocol">DOCS / MANUAL</span>
+                    </div>
+                    <div class="card-title">guide.html</div>
+                    <div class="card-desc">Guia interativo de diretrizes e especificações técnicas de navegação.</div>
+                </div>
+                <div class="card-footer">
+                    <span>STATUS: ACTIVE</span>
+                    <span class="execute-btn">EXECUTE &gt;</span>
+                </div>
+            </a>
+
+            <a href="https://javashow.pages.dev/nebula.html" class="nav-card alt-theme">
+                <div>
+                    <div class="card-header">
+                        <span class="card-id">// SYS_04</span>
+                        <span class="protocol">UI / NEBULA-v1</span>
+                    </div>
+                    <div class="card-title">nebula.html</div>
+                    <div class="card-desc">Interface futurista com renderização visual inspirada na nebulosa original.</div>
+                </div>
+                <div class="card-footer">
+                    <span>STATUS: ACTIVE</span>
+                    <span class="execute-btn">EXECUTE &gt;</span>
+                </div>
+            </a>
+
+            <a href="https://javashow.pages.dev/nebula2.html" class="nav-card">
+                <div>
+                    <div class="card-header">
+                        <span class="card-id">// SYS_05</span>
+                        <span class="protocol">UI / NEBULA-v2</span>
+                    </div>
+                    <div class="card-title">nebula2.html</div>
+                    <div class="card-desc">Evolução do motor gráfico Nebula Astra otimizado para carregamento ultra-rápido.</div>
+                </div>
+                <div class="card-footer">
+                    <span>STATUS: ACTIVE</span>
+                    <span class="execute-btn">EXECUTE &gt;</span>
+                </div>
+            </a>
+
+            <a href="https://javashow.pages.dev/nexus.html" class="nav-card alt-theme">
+                <div>
+                    <div class="card-header">
+                        <span class="card-id">// SYS_06</span>
+                        <span class="protocol">CORE / HUB</span>
+                    </div>
+                    <div class="card-title">nexus.html</div>
+                    <div class="card-desc">Ponto de convergência central para conexão e roteamento de APIs do projeto.</div>
+                </div>
+                <div class="card-footer">
+                    <span>STATUS: ACTIVE</span>
+                    <span class="execute-btn">EXECUTE &gt;</span>
+                </div>
+            </a>
+
+            <a href="https://javashow.pages.dev/tools.html" class="nav-card">
+                <div>
+                    <div class="card-header">
+                        <span class="card-id">// SYS_07</span>
+                        <span class="protocol">UTILITY / SUITE</span>
+                    </div>
+                    <div class="card-title">tools.html</div>
+                    <div class="card-desc">Painel de ferramentas, scripts auxiliares e manipuladores de assets.</div>
+                </div>
+                <div class="card-footer">
+                    <span>STATUS: ACTIVE</span>
+                    <span class="execute-btn">EXECUTE &gt;</span>
+                </div>
+            </a>
+
+            <a href="https://javashow.pages.dev/index2.html" class="nav-card alt-theme">
+                <div>
+                    <div class="card-header">
+                        <span class="card-id">// SYS_08</span>
+                        <span class="protocol">ARCHIVE / v2</span>
+                    </div>
+                    <div class="card-title">index2.html</div>
+                    <div class="card-desc">Versão legada de entrada mantida no repositório para preservação de rotas.</div>
+                </div>
+                <div class="card-footer">
+                    <span>STATUS: ARCHIVED</span>
+                    <span class="execute-btn">EXECUTE &gt;</span>
+                </div>
+            </a>
+
+            <a href="https://javashow.pages.dev/indexsivraj.html" class="nav-card">
+                <div>
+                    <div class="card-header">
+                        <span class="card-id">// SYS_09</span>
+                        <span class="protocol">LAYOUT / SIVRAJ</span>
+                    </div>
+                    <div class="card-title">indexsivraj.html</div>
+                    <div class="card-desc">Instância customizada baseada na arquitetura e estilo do módulo Sivraj.</div>
+                </div>
+                <div class="card-footer">
+                    <span>STATUS: ACTIVE</span>
+                    <span class="execute-btn">EXECUTE &gt;</span>
+                </div>
+            </a>
+        </div>
+
+        <footer>
+            JAVASHOW MATRIX INTERFACE // POWERED BY THREE.JS &amp; CLOUDFLARE PAGES // 2026
+        </footer>
+    </div>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Setup Three.js Scene
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x02040a, 0.0015);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 40;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // Core Hyper-Tech Object 1: Wireframe Torus Knot
+        const geometry = new THREE.TorusKnotGeometry(12, 3, 128, 32);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x00f3ff,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.25
+        });
+        const torusKnot = new THREE.Mesh(geometry, material);
+        scene.add(torusKnot);
+
+        // Core Hyper-Tech Object 2: Inner Core Icosahedron
+        const coreGeo = new THREE.IcosahedronGeometry(6, 2);
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0xff0055,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.4
+        });
+        const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+        scene.add(coreMesh);
+
+        // Particle System
+        const particlesCount = 2000;
+        const posArray = new Float32Array(particlesCount * 3);
+        for(let i = 0; i < particlesCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 150;
+        }
+
+        const particlesGeo = new THREE.BufferGeometry();
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+        const particlesMat = new THREE.PointsMaterial({
+            size: 0.15,
+            color: 0x00f3ff,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending
+        });
+
+        const particlesMesh = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(particlesMesh);
+
+        // Interactive Mouse Tracking
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetX = 0;
+        let targetY = 0;
+
+        const windowHalfX = window.innerWidth / 2;
+        const windowHalfY = window.innerHeight / 2;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX - windowHalfX);
+            mouseY = (e.clientY - windowHalfY);
+        });
+
+        // Animation Loop
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsedTime = clock.getElapsedTime();
+
+            // Rotation effects
+            torusKnot.rotation.x = elapsedTime * 0.15;
+            torusKnot.rotation.y = elapsedTime * 0.2;
+
+            coreMesh.rotation.x = -elapsedTime * 0.25;
+            coreMesh.rotation.y = -elapsedTime * 0.3;
+
+            particlesMesh.rotation.y = -elapsedTime * 0.03;
+
+            // Smooth Mouse Follow (Parallax)
+            targetX = mouseX * 0.001;
+            targetY = mouseY * 0.001;
+
+            camera.position.x += (targetX * 10 - camera.position.x) * 0.05;
+            camera.position.y += (-targetY * 10 - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Responsive Resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
