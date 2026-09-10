@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>O Almanaque dos Autômatos e Engenhos de Inteligência (1930)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Special+Elite&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-paper: #f4ebd0;
+            --ink-black: #1b1815;
+            --sepia-dark: #3a2e23;
+            --border-rule: #2a2018;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-paper);
+            color: var(--ink-black);
+            font-family: 'Old Standard TT', Georgia, serif;
+            padding: 20px;
+            line-height: 1.4;
+            background-image: radial-gradient(#d6c9a3 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+
+        .gazette-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            border: 4px double var(--border-rule);
+            padding: 25px;
+            background-color: #f7efe0;
+            box-shadow: 0 0 15px rgba(0,0,0,0.15);
+        }
+
+        /* Cabeçalho Anos 30 */
+        header {
+            text-align: center;
+            border-bottom: 3px double var(--border-rule);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .sub-header-top {
+            font-family: 'Special Elite', monospace;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-rule);
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.8rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            line-height: 1.1;
+            margin: 10px 0;
+        }
+
+        .tagline {
+            font-style: italic;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+
+        .header-bar {
+            border-top: 2px solid var(--border-rule);
+            border-bottom: 1px solid var(--border-rule);
+            padding: 4px 0;
+            font-family: 'Special Elite', monospace;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        /* Estrutura de Colunas de Jornal */
+        .columns-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .category-block {
+            border: 1px solid var(--border-rule);
+            padding: 15px;
+            background-color: #faf4e8;
+            position: relative;
+        }
+
+        .category-block::before {
+            content: '';
+            position: absolute;
+            top: 3px; left: 3px; right: 3px; bottom: 3px;
+            border: 1px dashed var(--border-rule);
+            pointer-events: none;
+        }
+
+        .category-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.4rem;
+            text-transform: uppercase;
+            text-align: center;
+            border-bottom: 2px solid var(--border-rule);
+            padding-bottom: 5px;
+            margin-bottom: 12px;
+            background-color: var(--sepia-dark);
+            color: var(--bg-paper);
+        }
+
+        .tool-list {
+            list-style: none;
+        }
+
+        .tool-item {
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px dotted var(--border-rule);
+            font-size: 0.95rem;
+        }
+
+        .tool-item:last-child {
+            border-bottom: none;
+        }
+
+        .tool-name {
+            font-weight: bold;
+            font-family: 'Playfair Display', serif;
+            font-size: 1.05rem;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+
+        .tool-desc {
+            display: block;
+            text-align: justify;
+            font-size: 0.88rem;
+            color: #2b231b;
+        }
+
+        /* Rodapé */
+        footer {
+            margin-top: 30px;
+            border-top: 3px double var(--border-rule);
+            padding-top: 10px;
+            text-align: center;
+            font-family: 'Special Elite', monospace;
+            font-size: 0.8rem;
+        }
+
+        .vintage-stamp {
+            display: inline-block;
+            border: 2px solid #8b0000;
+            color: #8b0000;
+            padding: 5px 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            transform: rotate(-2deg);
+            margin-top: 10px;
+            font-family: 'Special Elite', monospace;
+        }
+    </style>
+</head>
+<body>
+
+<div class="gazette-container">
+    <header>
+        <div class="sub-header-top">
+            <span>Edição Extraordinária</span>
+            <span>Ano de 1930</span>
+            <span>Preço: 200 Réis</span>
+        </div>
+        <h1>Gazeta dos Autômatos Digitais</h1>
+        <p class="tagline">Compêndio Ilustrado das 60 Ferramentas de Inteligência Sintética e Mecanização do Trabalho</p>
+        <div class="header-bar">
+            Relatório de Tecnologias Modernas para Propaganda, Cálculo, Cinematografia e Comércio
+        </div>
+    </header>
+
+    <main class="columns-grid">
+
+        <!-- MARKETING -->
+        <section class="category-block">
+            <h2 class="category-title">I. Propaganda e Imprensa</h2>
+            <ul class="tool-list">
+                <li class="tool-item">
+                    <span class="tool-name">Ahrefs & SEMrush</span>
+                    <span class="tool-desc">Engenhos de sondagem telegráfica que inspecionam o tráfego de leitores e a visibilidade nos catálogos públicos.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">SEO.ai</span>
+                    <span class="tool-desc">Calculadora de redação otimizada para posicionar artigos em gazetas eletrônicas.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Tweet Hunter & Taplio</span>
+                    <span class="tool-desc">Mecanismos automatizados para a distribuição de notas curtas e boletins pessoais em redes de comunicação instantânea.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Writesonic, Jasper & Copy.ai</span>
+                    <span class="tool-desc">Autômatos redatores capazes de compor anúncios comerciais, panfletos e cartas persuasivas em instantes.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Podnotes</span>
+                    <span class="tool-desc">Aparelho de estenografia para transcrição e resumos automáticos de transmissões de rádio e áudio.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Ocoya</span>
+                    <span class="tool-desc">Central de agendamento e gerenciamento para campanhas de publicidade em múltiplos periódicos.</span>
+                </li>
+            </ul>
+        </section>
+
+        <!-- VIDEO CREATION -->
+        <section class="category-block">
+            <h2 class="category-title">II. Cinematografia Sintética</h2>
+            <ul class="tool-list">
+                <li class="tool-item">
+                    <span class="tool-name">InVideo AI & Pictory</span>
+                    <span class="tool-desc">Engenhos cinematográficos que transformam manuscritos em películas completas com locução e montagem.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">HeyGen, Synthesia & Colossyan</span>
+                    <span class="tool-desc">Aparelhos de projeção que criam atores virtuais falantes para apresentações corporativas e institucionais.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Runway ML & Kling AI</span>
+                    <span class="tool-desc">Laboratórios de ilusão de ótica que geram tomadas cinematográficas complexas a partir de instruções escritas.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Descript</span>
+                    <span class="tool-desc">Oficina de edição fonográfica e de rodapés cinematográficos editáveis como se fossem texto datilografado.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Veed.io & Rovid</span>
+                    <span class="tool-desc">Ferramentas de montagem rápida de curtas-metragens e inserção de legendas para projeções populares.</span>
+                </li>
+            </ul>
+        </section>
+
+        <!-- PROGRAMMING -->
+        <section class="category-block">
+            <h2 class="category-title">III. Algoritmos e Programação</h2>
+            <ul class="tool-list">
+                <li class="tool-item">
+                    <span class="tool-name">GitHub Copilot & Amazon CodeWhisperer</span>
+                    <span class="tool-desc">Assistentes de datilografia técnica que preveem e completam linhas de código para engenheiros de sistemas.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Cursor, Windsurf & Bolt</span>
+                    <span class="tool-desc">Ateliês de programação moderna capazes de projetar e construir softwares inteiros sob orientação falada ou escrita.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Blackbox AI, Phind & Tabnine</span>
+                    <span class="tool-desc">Consultores lógicos para a resolução imediata de enigmas e erros em rotinas de cálculo.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Replit Agent & Codeium</span>
+                    <span class="tool-desc">Autômatos capazes de executar e implantar aplicações sem necessidade de maquinário local pesado.</span>
+                </li>
+            </ul>
+        </section>
+
+        <!-- PRODUCTIVITY -->
+        <section class="category-block">
+            <h2 class="category-title">IV. Escritório e Eficiência</h2>
+            <ul class="tool-list">
+                <li class="tool-item">
+                    <span class="tool-name">ChatGPT & Claude</span>
+                    <span class="tool-desc">Oráculos universais de consulta, redação e análise lógica de utilidade geral para gabinetes de trabalho.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Devin AI</span>
+                    <span class="tool-desc">O primeiro engenheiro autônomo artificial, capaz de executar tarefas complexas de desenvolvimento de forma independente.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Notion AI, ClickUp & Monday.com</span>
+                    <span class="tool-desc">Organizadores de arquivos, quadros de tarefas e diretórios de projetos para secretarias modernas.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Otter.ai & Mem AI</span>
+                    <span class="tool-desc">Estenógrafos automáticos para atas de reuniões e recuperação de memórias do escritório.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Napkin AI & BeforeSunset AI</span>
+                    <span class="tool-desc">Ferramentas de esquematização visual de ideias e planejamento de rotinas diárias.</span>
+                </li>
+            </ul>
+        </section>
+
+        <!-- DESIGN -->
+        <section class="category-block">
+            <h2 class="category-title">V. Artes Gráficas e Tipografia</h2>
+            <ul class="tool-list">
+                <li class="tool-item">
+                    <span class="tool-name">Canva AI, Microsoft Designer & Visme</span>
+                    <span class="tool-desc">Oficinas gráficas simplificadas para a confecção de cartazes, ilustrações e panfletos comerciais.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Adobe Firefly & Leonardo AI</span>
+                    <span class="tool-desc">Ateliês de pintura digital de altíssima precisão para criação de gravuras e retoques artísticos.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Figma Designer & Uizard</span>
+                    <span class="tool-desc">Arquitetos de maquetes e interfaces para o desenho de telas operacionais.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Kittl & Looka</span>
+                    <span class="tool-desc">Ferramentas especializadas na criação de logotipos, brasões corporativos e tipografia ornada.</span>
+                </li>
+            </ul>
+        </section>
+
+        <!-- SALES -->
+        <section class="category-block">
+            <h2 class="category-title">VI. Comércio e Negócios</h2>
+            <ul class="tool-list">
+                <li class="tool-item">
+                    <span class="tool-name">HubSpot & Salesforce Einstein</span>
+                    <span class="tool-desc">Grandes livros-caixa inteligentes para o acompanhamento e análise de carteiras de clientes.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Apollo AI, Clay & Seamless.AI</span>
+                    <span class="tool-desc">Bancos de dados e diretórios para localização de contatos e oportunidades comerciais.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Superhuman & Lavender</span>
+                    <span class="tool-desc">Correspondentes para redação e despacho ultra-rápido de cartas de negócios.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Gong & ChatSonic</span>
+                    <span class="tool-desc">Sistemas de análise de conversas e atendimento automático a compradores.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Regie.ai</span>
+                    <span class="tool-desc">Criador de rotinas de prospeção e contato sistemático com clientes em potencial.</span>
+                </li>
+            </ul>
+        </section>
+
+        <!-- BONUS TOOLS -->
+        <section class="category-block">
+            <h2 class="category-title">VII. Instrumental Suplementar</h2>
+            <ul class="tool-list">
+                <li class="tool-item">
+                    <span class="tool-name">Midjourney & DALL-E 3</span>
+                    <span class="tool-desc">Câmeras fotográficas da imaginação, capazes de materializar qualquer ilustração por comando de texto.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Perplexity & You.com</span>
+                    <span class="tool-desc">Bibliotecários sintéticos que pesquisam e resumem enciclopédias inteiras com citações de fontes.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">QuillBot & Grammarly</span>
+                    <span class="tool-desc">Revisores de estilo e gramática para correção de ortografia e aprimoramento da prosa.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">Fireflies.ai, Tome & Eightfold AI</span>
+                    <span class="tool-desc">Aparelhos para gravação de palestras, criação de apresentações e seleção de quadros de funcionários.</span>
+                </li>
+                <li class="tool-item">
+                    <span class="tool-name">CopyMonkey</span>
+                    <span class="tool-desc">Gerador de anúncios e descrições para catálogos de mercadorias.</span>
+                </li>
+            </ul>
+        </section>
+
+    </main>
+
+    <footer>
+        <p>Impresso nas Oficinas Tipográficas da Era do Silício — Todos os direitos reservados aos inventores e artesãos do futuro.</p>
+        <div class="vintage-stamp">Aprovado pelo Conselho de Tecnologia - 1930</div>
+    </footer>
+</div>
+
+</body>
+</html>
