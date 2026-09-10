@@ -3,14 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>O Almanaque dos Autômatos e Engenhos de Inteligência (1930)</title>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Special+Elite&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <title>60 AI Tools - The Ultimate AI Toolkit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-paper: #f4ebd0;
-            --ink-black: #1b1815;
-            --sepia-dark: #3a2e23;
-            --border-rule: #2a2018;
+            --bg-color: #0b0c1b;
+            --card-bg: rgba(23, 25, 54, 0.8);
+            --card-border: rgba(110, 86, 207, 0.25);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a5c0;
+            --accent-purple: #7952ff;
+            --accent-blue: #00d2ff;
+            --accent-pink: #ff416c;
+            --badge-bg: rgba(121, 82, 255, 0.15);
         }
 
         * {
@@ -20,365 +25,517 @@
         }
 
         body {
-            background-color: var(--bg-paper);
-            color: var(--ink-black);
-            font-family: 'Old Standard TT', Georgia, serif;
-            padding: 20px;
-            line-height: 1.4;
-            background-image: radial-gradient(#d6c9a3 1px, transparent 0);
-            background-size: 24px 24px;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(121, 82, 255, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(0, 210, 255, 0.12) 0%, transparent 40%);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            padding: 30px 20px;
+            min-height: 100vh;
         }
 
-        .gazette-container {
-            max-width: 1100px;
+        .poster-container {
+            max-width: 1300px;
             margin: 0 auto;
-            border: 4px double var(--border-rule);
-            padding: 25px;
-            background-color: #f7efe0;
-            box-shadow: 0 0 15px rgba(0,0,0,0.15);
         }
 
-        /* Cabeçalho Anos 30 */
+        /* Header */
         header {
             text-align: center;
-            border-bottom: 3px double var(--border-rule);
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
-
-        .sub-header-top {
-            font-family: 'Special Elite', monospace;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            display: flex;
-            justify-content: space-between;
-            border-bottom: 1px solid var(--border-rule);
-            padding-bottom: 5px;
-            margin-bottom: 10px;
-        }
-
-        h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: 2.8rem;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            line-height: 1.1;
-            margin: 10px 0;
-        }
-
-        .tagline {
-            font-style: italic;
-            font-size: 1.1rem;
-            margin-bottom: 10px;
-        }
-
-        .header-bar {
-            border-top: 2px solid var(--border-rule);
-            border-bottom: 1px solid var(--border-rule);
-            padding: 4px 0;
-            font-family: 'Special Elite', monospace;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-        }
-
-        /* Estrutura de Colunas de Jornal */
-        .columns-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 25px;
-            margin-top: 20px;
-        }
-
-        .category-block {
-            border: 1px solid var(--border-rule);
-            padding: 15px;
-            background-color: #faf4e8;
+            margin-bottom: 40px;
             position: relative;
         }
 
-        .category-block::before {
-            content: '';
-            position: absolute;
-            top: 3px; left: 3px; right: 3px; bottom: 3px;
-            border: 1px dashed var(--border-rule);
-            pointer-events: none;
+        .main-title {
+            font-size: 3.2rem;
+            font-weight: 900;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, #ffffff 0%, #b8c1ec 50%, var(--accent-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            line-height: 1.1;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-top: 10px;
+        }
+
+        /* Categories Grid */
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 24px;
+        }
+
+        .category-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .category-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(121, 82, 255, 0.5);
+        }
+
+        .category-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(90deg, rgba(121, 82, 255, 0.2) 0%, rgba(0, 210, 255, 0.2) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 18px;
         }
 
         .category-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.4rem;
+            font-size: 1.1rem;
+            font-weight: 800;
             text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #ffffff;
             text-align: center;
-            border-bottom: 2px solid var(--border-rule);
-            padding-bottom: 5px;
-            margin-bottom: 12px;
-            background-color: var(--sepia-dark);
-            color: var(--bg-paper);
         }
 
-        .tool-list {
-            list-style: none;
+        /* Tools List */
+        .tools-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .tool-item {
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 1px dotted var(--border-rule);
-            font-size: 0.95rem;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 10px 12px;
+            transition: background 0.2s ease;
         }
 
-        .tool-item:last-child {
-            border-bottom: none;
+        .tool-item:hover {
+            background: rgba(255, 255, 255, 0.07);
         }
 
         .tool-name {
-            font-weight: bold;
-            font-family: 'Playfair Display', serif;
-            font-size: 1.05rem;
-            text-transform: uppercase;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tool-name::before {
+            content: '';
             display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: var(--accent-blue);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-blue);
         }
 
         .tool-desc {
-            display: block;
-            text-align: justify;
-            font-size: 0.88rem;
-            color: #2b231b;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            line-height: 1.35;
         }
 
-        /* Rodapé */
+        /* Footer */
         footer {
-            margin-top: 30px;
-            border-top: 3px double var(--border-rule);
-            padding-top: 10px;
             text-align: center;
-            font-family: 'Special Elite', monospace;
-            font-size: 0.8rem;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
         }
 
-        .vintage-stamp {
-            display: inline-block;
-            border: 2px solid #8b0000;
-            color: #8b0000;
-            padding: 5px 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-            transform: rotate(-2deg);
-            margin-top: 10px;
-            font-family: 'Special Elite', monospace;
+        @media (max-width: 768px) {
+            .main-title {
+                font-size: 2.2rem;
+            }
+            .subtitle {
+                font-size: 0.9rem;
+            }
+            .categories-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
 
-<div class="gazette-container">
+<div class="poster-container">
     <header>
-        <div class="sub-header-top">
-            <span>Edição Extraordinária</span>
-            <span>Ano de 1930</span>
-            <span>Preço: 200 Réis</span>
-        </div>
-        <h1>Gazeta dos Autômatos Digitais</h1>
-        <p class="tagline">Compêndio Ilustrado das 60 Ferramentas de Inteligência Sintética e Mecanização do Trabalho</p>
-        <div class="header-bar">
-            Relatório de Tecnologias Modernas para Propaganda, Cálculo, Cinematografia e Comércio
-        </div>
+        <h1 class="main-title">60 AI Tools</h1>
+        <p class="subtitle">The Ultimate AI Toolkit for Everyone</p>
     </header>
 
-    <main class="columns-grid">
+    <main class="categories-grid">
 
         <!-- MARKETING -->
-        <section class="category-block">
-            <h2 class="category-title">I. Propaganda e Imprensa</h2>
-            <ul class="tool-list">
-                <li class="tool-item">
-                    <span class="tool-name">Ahrefs & SEMrush</span>
-                    <span class="tool-desc">Engenhos de sondagem telegráfica que inspecionam o tráfego de leitores e a visibilidade nos catálogos públicos.</span>
-                </li>
-                <li class="tool-item">
+        <section class="category-card">
+            <div class="category-header">
+                <h2 class="category-title">Marketing</h2>
+            </div>
+            <div class="tools-list">
+                <div class="tool-item">
+                    <span class="tool-name">Ahrefs</span>
+                    <span class="tool-desc">Plataforma de análise de SEO, auditoria de sites e pesquisa de concorrência e palavras-chave.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">SEMrush</span>
+                    <span class="tool-desc">Suite completa para marketing digital, otimização de busca (SEO) e inteligência de mercado.</span>
+                </div>
+                <div class="tool-item">
                     <span class="tool-name">SEO.ai</span>
-                    <span class="tool-desc">Calculadora de redação otimizada para posicionar artigos em gazetas eletrônicas.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Tweet Hunter & Taplio</span>
-                    <span class="tool-desc">Mecanismos automatizados para a distribuição de notas curtas e boletins pessoais em redes de comunicação instantânea.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Writesonic, Jasper & Copy.ai</span>
-                    <span class="tool-desc">Autômatos redatores capazes de compor anúncios comerciais, panfletos e cartas persuasivas em instantes.</span>
-                </li>
-                <li class="tool-item">
+                    <span class="tool-desc">Geração de artigos e textos otimizados por IA para ranqueamento nos motores de busca.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Tweet Hunter</span>
+                    <span class="tool-desc">Automação, geração de ideias e agendamento para crescimento de audiência no Twitter/X.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Writesonic</span>
+                    <span class="tool-desc">Criação automatizada de artigos longos, anúncios para redes sociais e textos de vendas.</span>
+                </div>
+                <div class="tool-item">
                     <span class="tool-name">Podnotes</span>
-                    <span class="tool-desc">Aparelho de estenografia para transcrição e resumos automáticos de transmissões de rádio e áudio.</span>
-                </li>
-                <li class="tool-item">
+                    <span class="tool-desc">Transcrição automática, resumos e geração de conteúdos a partir de episódios de podcasts.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Jasper</span>
+                    <span class="tool-desc">Assistente de redação corporativa voltado para equipes de marketing e criação de conteúdo.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Copy.ai</span>
+                    <span class="tool-desc">Gerador de textos persuasivos para e-mails de vendas, anúncios e postagens em redes sociais.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Taplio</span>
+                    <span class="tool-desc">Ferramenta focada em criação de conteúdo, agendamento e construção de autoridade no LinkedIn.</span>
+                </div>
+                <div class="tool-item">
                     <span class="tool-name">Ocoya</span>
-                    <span class="tool-desc">Central de agendamento e gerenciamento para campanhas de publicidade em múltiplos periódicos.</span>
-                </li>
-            </ul>
+                    <span class="tool-desc">Plataforma para criação de peças gráficas, redação de legendas e agendamento de posts.</span>
+                </div>
+            </div>
         </section>
 
         <!-- VIDEO CREATION -->
-        <section class="category-block">
-            <h2 class="category-title">II. Cinematografia Sintética</h2>
-            <ul class="tool-list">
-                <li class="tool-item">
-                    <span class="tool-name">InVideo AI & Pictory</span>
-                    <span class="tool-desc">Engenhos cinematográficos que transformam manuscritos em películas completas com locução e montagem.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">HeyGen, Synthesia & Colossyan</span>
-                    <span class="tool-desc">Aparelhos de projeção que criam atores virtuais falantes para apresentações corporativas e institucionais.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Runway ML & Kling AI</span>
-                    <span class="tool-desc">Laboratórios de ilusão de ótica que geram tomadas cinematográficas complexas a partir de instruções escritas.</span>
-                </li>
-                <li class="tool-item">
+        <section class="category-card">
+            <div class="category-header">
+                <h2 class="category-title">Video Creation</h2>
+            </div>
+            <div class="tools-list">
+                <div class="tool-item">
+                    <span class="tool-name">InVideo AI</span>
+                    <span class="tool-desc">Transforma roteiros e ideias de texto em vídeos editados completos com narração e imagens.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Pictory</span>
+                    <span class="tool-desc">Converte textos, artigos de blog e roteiros em vídeos curtos ideais para redes sociais.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">HeyGen</span>
+                    <span class="tool-desc">Geração de avatares digitais fotorrealistas e tradução automática de vídeos com clonagem de voz.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Runway ML</span>
+                    <span class="tool-desc">Ferramenta avançada de geração e edição de vídeo por IA (Text-to-Video e Image-to-Video).</span>
+                </div>
+                <div class="tool-item">
                     <span class="tool-name">Descript</span>
-                    <span class="tool-desc">Oficina de edição fonográfica e de rodapés cinematográficos editáveis como se fossem texto datilografado.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Veed.io & Rovid</span>
-                    <span class="tool-desc">Ferramentas de montagem rápida de curtas-metragens e inserção de legendas para projeções populares.</span>
-                </li>
-            </ul>
+                    <span class="tool-desc">Edição intuitiva de áudio e vídeo editando diretamente o texto da transcrição.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Veed.io</span>
+                    <span class="tool-desc">Editor de vídeo online completo com inserção automática de legendas e remoção de ruídos.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Rovid</span>
+                    <span class="tool-desc">Criação rápida de cortes de vídeos e clipes dinamizados para TikTok, Shorts e Reels.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Kling AI</span>
+                    <span class="tool-desc">Modelo de geração de vídeos por IA com física realista e movimentos de alta qualidade.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Synthesia</span>
+                    <span class="tool-desc">Criação de vídeos apresentados por avatares virtuais para treinamentos e apresentações corporativas.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Colossyan</span>
+                    <span class="tool-desc">Gerador de vídeos com atores de IA voltado para comunicação interna e e-learning.</span>
+                </div>
+            </div>
         </section>
 
         <!-- PROGRAMMING -->
-        <section class="category-block">
-            <h2 class="category-title">III. Algoritmos e Programação</h2>
-            <ul class="tool-list">
-                <li class="tool-item">
-                    <span class="tool-name">GitHub Copilot & Amazon CodeWhisperer</span>
-                    <span class="tool-desc">Assistentes de datilografia técnica que preveem e completam linhas de código para engenheiros de sistemas.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Cursor, Windsurf & Bolt</span>
-                    <span class="tool-desc">Ateliês de programação moderna capazes de projetar e construir softwares inteiros sob orientação falada ou escrita.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Blackbox AI, Phind & Tabnine</span>
-                    <span class="tool-desc">Consultores lógicos para a resolução imediata de enigmas e erros em rotinas de cálculo.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Replit Agent & Codeium</span>
-                    <span class="tool-desc">Autômatos capazes de executar e implantar aplicações sem necessidade de maquinário local pesado.</span>
-                </li>
-            </ul>
+        <section class="category-card">
+            <div class="category-header">
+                <h2 class="category-title">Programming</h2>
+            </div>
+            <div class="tools-list">
+                <div class="tool-item">
+                    <span class="tool-name">GitHub Copilot</span>
+                    <span class="tool-desc">Assistente de autocompletar e sugestão de código em tempo real integrado às IDEs.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Blackbox AI</span>
+                    <span class="tool-desc">Busca rápida de código, conversão de imagens em código e suporte para depuração.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Replit Agent</span>
+                    <span class="tool-desc">Agente autônomo que cria, testa e faz o deploy de aplicações de software completas a partir de prompts.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Cursor</span>
+                    <span class="tool-desc">Editor de código baseado em VS Code nativamente construído para programação orientada a IA.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Codeium</span>
+                    <span class="tool-desc">Assistente gratuito de aceleração de código e autocompletar multilinguagem para desenvolvedores.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Phind</span>
+                    <span class="tool-desc">Mecanismo de busca e resposta técnica especializado em tirar dúvidas de programação.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Tabnine</span>
+                    <span class="tool-desc">Assistente de código com foco em privacidade que aprende com os padrões do seu repositório.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Windsurf</span>
+                    <span class="tool-desc">IDE moderna baseada em agentes de IA que colaboram de forma profunda no desenvolvimento.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Bolt</span>
+                    <span class="tool-desc">Ambiente de desenvolvimento no navegador para construir e rodar apps full-stack instantaneamente.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Amazon CodeWhisperer</span>
+                    <span class="tool-desc">Gerador de código da AWS focado em segurança e integração com infraestrutura em nuvem.</span>
+                </div>
+            </div>
         </section>
 
         <!-- PRODUCTIVITY -->
-        <section class="category-block">
-            <h2 class="category-title">IV. Escritório e Eficiência</h2>
-            <ul class="tool-list">
-                <li class="tool-item">
-                    <span class="tool-name">ChatGPT & Claude</span>
-                    <span class="tool-desc">Oráculos universais de consulta, redação e análise lógica de utilidade geral para gabinetes de trabalho.</span>
-                </li>
-                <li class="tool-item">
+        <section class="category-card">
+            <div class="category-header">
+                <h2 class="category-title">Productivity</h2>
+            </div>
+            <div class="tools-list">
+                <div class="tool-item">
+                    <span class="tool-name">Notion AI</span>
+                    <span class="tool-desc">Integração de IA para resumir notas, redigir documentos e organizar tarefas no Notion.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">ClickUp</span>
+                    <span class="tool-desc">Plataforma de gestão de projetos com automações e escrita de documentos assistida.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Monday.com</span>
+                    <span class="tool-desc">Sistema operacional de trabalho com recursos de automação de fluxos e análise de processos.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Napkin AI</span>
+                    <span class="tool-desc">Transforma ideias e textos automaticamente em esquemas visuais, diagramas e infográficos.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">BeforeSunset AI</span>
+                    <span class="tool-desc">Planejador diário inteligente que otimiza sua lista de tarefas e agenda de compromissos.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Otter.ai</span>
+                    <span class="tool-desc">Transcrição automática de reuniões em tempo real com geração de notas e itens de ação.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Mem AI</span>
+                    <span class="tool-desc">Bloco de notas pessoal que conecta e organiza suas informações e ideias automaticamente.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">ChatGPT</span>
+                    <span class="tool-desc">Assistente conversacional versátil para pesquisa, análise, redação e resolução de problemas.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Claude</span>
+                    <span class="tool-desc">IA avançada focada em raciocínio complexo, síntese de grandes textos e programação.</span>
+                </div>
+                <div class="tool-item">
                     <span class="tool-name">Devin AI</span>
-                    <span class="tool-desc">O primeiro engenheiro autônomo artificial, capaz de executar tarefas complexas de desenvolvimento de forma independente.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Notion AI, ClickUp & Monday.com</span>
-                    <span class="tool-desc">Organizadores de arquivos, quadros de tarefas e diretórios de projetos para secretarias modernas.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Otter.ai & Mem AI</span>
-                    <span class="tool-desc">Estenógrafos automáticos para atas de reuniões e recuperação de memórias do escritório.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Napkin AI & BeforeSunset AI</span>
-                    <span class="tool-desc">Ferramentas de esquematização visual de ideias e planejamento de rotinas diárias.</span>
-                </li>
-            </ul>
+                    <span class="tool-desc">Engenheiro de software autônomo capaz de planejar, executar e depurar projetos complexos.</span>
+                </div>
+            </div>
         </section>
 
         <!-- DESIGN -->
-        <section class="category-block">
-            <h2 class="category-title">V. Artes Gráficas e Tipografia</h2>
-            <ul class="tool-list">
-                <li class="tool-item">
-                    <span class="tool-name">Canva AI, Microsoft Designer & Visme</span>
-                    <span class="tool-desc">Oficinas gráficas simplificadas para a confecção de cartazes, ilustrações e panfletos comerciais.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Adobe Firefly & Leonardo AI</span>
-                    <span class="tool-desc">Ateliês de pintura digital de altíssima precisão para criação de gravuras e retoques artísticos.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Figma Designer & Uizard</span>
-                    <span class="tool-desc">Arquitetos de maquetes e interfaces para o desenho de telas operacionais.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Kittl & Looka</span>
-                    <span class="tool-desc">Ferramentas especializadas na criação de logotipos, brasões corporativos e tipografia ornada.</span>
-                </li>
-            </ul>
+        <section class="category-card">
+            <div class="category-header">
+                <h2 class="category-title">Design</h2>
+            </div>
+            <div class="tools-list">
+                <div class="tool-item">
+                    <span class="tool-name">Canva AI</span>
+                    <span class="tool-desc">Suíte de design gráfico com gerador de imagens, edição mágica e templates inteligentes.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Adobe Firefly</span>
+                    <span class="tool-desc">Gerador generativo de imagens e efeitos de texto integrado ao ecossistema Adobe.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Figma Designer</span>
+                    <span class="tool-desc">Recursos de IA para acelerar a criação de interfaces, protótipos e sistemas de design.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Microsoft Designer</span>
+                    <span class="tool-desc">Criação rápida de artes, cartazes e postagens visuais a partir de descrições em texto.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Simplified</span>
+                    <span class="tool-desc">Plataforma multifuncional para design gráfico, redação de posts e edição de vídeos.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Kittl</span>
+                    <span class="tool-desc">Ferramenta de design focada em ilustrações complexas, tipografia ornada e estampas.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Visme</span>
+                    <span class="tool-desc">Criação de apresentações interativas, infográficos e relatórios visuais atraentes.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Leonardo AI</span>
+                    <span class="tool-desc">Geração de assets artísticos de altíssima qualidade para jogos, conceitos e ilustrações.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Uizard</span>
+                    <span class="tool-desc">Converte rascunhos feitos à mão ou descrições em texto em protótipos de apps e telas.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Looka</span>
+                    <span class="tool-desc">Gerador automático de logotipos e identidades visuais completas para marcas.</span>
+                </div>
+            </div>
         </section>
 
         <!-- SALES -->
-        <section class="category-block">
-            <h2 class="category-title">VI. Comércio e Negócios</h2>
-            <ul class="tool-list">
-                <li class="tool-item">
-                    <span class="tool-name">HubSpot & Salesforce Einstein</span>
-                    <span class="tool-desc">Grandes livros-caixa inteligentes para o acompanhamento e análise de carteiras de clientes.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Apollo AI, Clay & Seamless.AI</span>
-                    <span class="tool-desc">Bancos de dados e diretórios para localização de contatos e oportunidades comerciais.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Superhuman & Lavender</span>
-                    <span class="tool-desc">Correspondentes para redação e despacho ultra-rápido de cartas de negócios.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Gong & ChatSonic</span>
-                    <span class="tool-desc">Sistemas de análise de conversas e atendimento automático a compradores.</span>
-                </li>
-                <li class="tool-item">
+        <section class="category-card">
+            <div class="category-header">
+                <h2 class="category-title">Sales</h2>
+            </div>
+            <div class="tools-list">
+                <div class="tool-item">
+                    <span class="tool-name">HubSpot AI</span>
+                    <span class="tool-desc">Recursos de automação de vendas, previsão de receita e CRM impulsionados por IA.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Superhuman</span>
+                    <span class="tool-desc">Cliente de e-mail de alta performance com resumos de threads e escrita veloz com IA.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Apollo AI</span>
+                    <span class="tool-desc">Prospecção B2B, localização de contatos e sequências automatizadas de e-mails.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Clay</span>
+                    <span class="tool-desc">Enriquecimento de dados de leads e automação de mensagens de vendas hiper-personalizadas.</span>
+                </div>
+                <div class="tool-item">
                     <span class="tool-name">Regie.ai</span>
-                    <span class="tool-desc">Criador de rotinas de prospeção e contato sistemático com clientes em potencial.</span>
-                </li>
-            </ul>
+                    <span class="tool-desc">Criação automatizada de campanhas de prospecção outbound para equipes de vendas.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Seamless.AI</span>
+                    <span class="tool-desc">Mecanismo de busca de dados de contato e telefones diretos de executivos e decisores.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">ChatSonic</span>
+                    <span class="tool-desc">Chatbot com acesso à internet em tempo real para pesquisas de mercado e abordagens.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Salesforce Einstein</span>
+                    <span class="tool-desc">Inteligência preditiva para análise de pipeline de vendas e comportamento do cliente.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Gong</span>
+                    <span class="tool-desc">Análise de chamadas de vendas e conversas para insights de receita e treinamento de equipes.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Lavender</span>
+                    <span class="tool-desc">Assistente que avalia e otimiza e-mails de vendas em tempo real para aumentar as respostas.</span>
+                </div>
+            </div>
         </section>
 
         <!-- BONUS TOOLS -->
-        <section class="category-block">
-            <h2 class="category-title">VII. Instrumental Suplementar</h2>
-            <ul class="tool-list">
-                <li class="tool-item">
-                    <span class="tool-name">Midjourney & DALL-E 3</span>
-                    <span class="tool-desc">Câmeras fotográficas da imaginação, capazes de materializar qualquer ilustração por comando de texto.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Perplexity & You.com</span>
-                    <span class="tool-desc">Bibliotecários sintéticos que pesquisam e resumem enciclopédias inteiras com citações de fontes.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">QuillBot & Grammarly</span>
-                    <span class="tool-desc">Revisores de estilo e gramática para correção de ortografia e aprimoramento da prosa.</span>
-                </li>
-                <li class="tool-item">
-                    <span class="tool-name">Fireflies.ai, Tome & Eightfold AI</span>
-                    <span class="tool-desc">Aparelhos para gravação de palestras, criação de apresentações e seleção de quadros de funcionários.</span>
-                </li>
-                <li class="tool-item">
+        <section class="category-card">
+            <div class="category-header">
+                <h2 class="category-title">Bonus Tools</h2>
+            </div>
+            <div class="tools-list">
+                <div class="tool-item">
+                    <span class="tool-name">Midjourney</span>
+                    <span class="tool-desc">Gerador de imagens artísticas e fotorrealistas de alta fidelidade a partir de texto.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">DALL-E 3</span>
+                    <span class="tool-desc">Modelo de criação de imagens da OpenAI integrado ao ChatGPT para prompts detalhados.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Perplexity</span>
+                    <span class="tool-desc">Mecanismo de busca conversacional que fornece respostas sintetizadas com fontes citadas.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">You.com</span>
+                    <span class="tool-desc">Buscador focado em privacidade que utiliza IA para resumir informações da web.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">QuillBot</span>
+                    <span class="tool-desc">Ferramenta de reescrita, paráfrase e aprimoramento de textos em diversos tons.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Grammarly</span>
+                    <span class="tool-desc">Assistente de escrita para correção ortográfica, gramatical e ajuste do tom da mensagem.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Fireflies.ai</span>
+                    <span class="tool-desc">Gravador e transcritor automático para reuniões no Zoom, Google Meet e Teams.</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Tome</span>
+                    <span class="tool-desc">Gerador de apresentações, histórias visuais e documentos iterativos com IA.</span>
+                </div>
+                <div class="tool-item">
                     <span class="tool-name">CopyMonkey</span>
-                    <span class="tool-desc">Gerador de anúncios e descrições para catálogos de mercadorias.</span>
-                </li>
-            </ul>
+                    <span class="tool-desc">Otimização de listagens de produtos e descrições para e-commerce (Amazon).</span>
+                </div>
+                <div class="tool-item">
+                    <span class="tool-name">Eightfold AI</span>
+                    <span class="tool-desc">Plataforma de inteligência de talentos para recrutamento e gestão de recursos humanos.</span>
+                </div>
+            </div>
         </section>
 
     </main>
 
     <footer>
-        <p>Impresso nas Oficinas Tipográficas da Era do Silício — Todos os direitos reservados aos inventores e artesãos do futuro.</p>
-        <div class="vintage-stamp">Aprovado pelo Conselho de Tecnologia - 1930</div>
+        <p>Toolkit de Inteligência Artificial — Organizado por Categorias</p>
     </footer>
 </div>
 
