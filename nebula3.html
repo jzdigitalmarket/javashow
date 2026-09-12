@@ -186,6 +186,8 @@
 
     #heatBar { background: #ff8d59; }
     #warpBar { background: #b28aff; }
+    #fuelBar { background: #57f0a1; }
+    #bombBar { background: #ffb45c; }
 
     #radarBox {
       position: absolute;
@@ -695,6 +697,14 @@
         <div class="label"><span>SALTO / F</span><span id="warpValue">100%</span></div>
         <div class="track"><div id="warpBar" class="fill"></div></div>
       </div>
+      <div class="meter">
+        <div class="label"><span>COMBUSTÍVEL</span><span id="fuelValue">100%</span></div>
+        <div class="track"><div id="fuelBar" class="fill"></div></div>
+      </div>
+      <div class="meter">
+        <div class="label"><span>BOMBA / B</span><span id="bombValue">2/2</span></div>
+        <div class="track"><div id="bombBar" class="fill"></div></div>
+      </div>
     </div>
 
     <div id="radarBox">
@@ -704,7 +714,7 @@
 
     <div id="hint">
       WASD · ESPAÇO / CTRL · SHIFT TURBO<br>
-      MOUSE / SETAS MIRAR · J ATIRAR · F SALTO · P PAUSA
+      MOUSE / SETAS MIRAR · J ATIRAR · B BOMBA · F SALTO · P PAUSA
     </div>
   </div>
 
@@ -723,14 +733,15 @@
           WASD — movimentar / MOUSE ou SETAS — mirar<br>
           ESPAÇO / CTRL — subir e descer<br>
           CLIQUE ou J — disparar / SHIFT — turbo<br>
-          F — hipervelocidade / P — pausa / R — reiniciar
+          B — bomba de emergência / F — hipervelocidade<br>
+          P — pausa / R — reiniciar
         </div>
 
         <div id="touchHelp">
           Direcional esquerdo — movimentar<br>
           Arraste na área direita — mirar<br>
           Segure TIRO, TURBO, SUBIR ou DESCER para usar<br>
-          Toque em SALTO para ativar a hipervelocidade<br>
+          Use BOMBA em perigo crítico / SALTO para hipervelocidade<br>
           Use PAUSA para trocar a música ou ajustar os controles
         </div>
       </div>
@@ -834,6 +845,10 @@
       <button id="touchFire" type="button" aria-label="Disparar">
         TIRO
       </button>
+
+      <button id="touchBomb" type="button" aria-label="Lançar bomba de emergência">
+        BOMBA
+      </button>
     </div>
   </div>
 
@@ -876,8 +891,16 @@
       ),
 
       stars: TOUCH_DEVICE ? 2500 : 6000,
-      asteroids: TOUCH_DEVICE ? 180 : 380,
+      asteroids: TOUCH_DEVICE ? 18 : 28,
       particles: TOUCH_DEVICE ? 700 : 1800,
+
+      sectorSize: 1600,
+      sectorRadiusXZ: 1,
+      asteroidsPerSector: TOUCH_DEVICE ? 3 : 5,
+      maxBombs: 2,
+      fuelDrainCruise: .20,
+      fuelDrainBoost: .75,
+      fuelDrainWarp: 2.2,
 
       drones: 9,
       cruiseSpeed: 48,
@@ -895,8 +918,10 @@
       start: $("start"), status: $("status"), message: $("message"),
       score: $("score"), speed: $("speed"), sector: $("sector"),
       shield: $("shieldBar"), heat: $("heatBar"), warp: $("warpBar"),
+      fuel: $("fuelBar"), bomb: $("bombBar"),
       shieldValue: $("shieldValue"), heatValue: $("heatValue"),
-      warpValue: $("warpValue"), reticle: $("reticle"), target: $("target")
+      warpValue: $("warpValue"), fuelValue: $("fuelValue"), bombValue: $("bombValue"),
+      reticle: $("reticle"), target: $("target")
     };
 
     const renderer = new THREE.WebGLRenderer({
@@ -1254,13 +1279,12 @@
     }
 
     // ============================================================
-    // ASTEROIDES INSTANCIADOS
+    // UNIVERSO PROCEDURAL INFINITO + ASTEROIDES DESTRUTÍVEIS
     // ============================================================
 
     const rockGeo = new THREE.IcosahedronGeometry(1, 1);
     const rockPosition = rockGeo.attributes.position;
 
-    // Deformação determinística: vértices coincidentes continuam coincidentes.
     for (let i = 0; i < rockPosition.count; i++) {
       const x = rockPosition.getX(i);
       const y = rockPosition.getY(i);
@@ -1270,40 +1294,315 @@
     }
     rockGeo.computeVertexNormals();
 
-    const rocks = new THREE.InstancedMesh(
-      rockGeo,
-      new THREE.MeshStandardMaterial({
-        color: 0x424556,
-        roughness: .95,
-        metalness: .15,
-        flatShading: true
-      }),
-      CONFIG.asteroids
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      color: 0x424556,
+      roughness: .95,
+      metalness: .15,
+      flatShading: true
+    });
+
+    const celestialGeo = new THREE.SphereGeometry(1, 28, 20);
+    const sunColors = [0xffc96b, 0xff8b5c, 0xbfd9ff];
+    const sunMaterials = sunColors.map(color =>
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2.2) })
     );
+    const sunCoronaMaterials = sunColors.map(color =>
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(color).multiplyScalar(1.5),
+        transparent: true, opacity: .10, side: THREE.BackSide,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      })
+    );
+    const planetMaterials = [0x4a7e8d, 0x79638e, 0x756d4d, 0x3c6f55].map(color =>
+      new THREE.MeshStandardMaterial({ color, roughness: .88, metalness: .04 })
+    );
+    const planetRingGeo = new THREE.TorusGeometry(1, .05, 6, 48);
+    const planetRingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x9c8f7a, roughness: .9, metalness: 0
+    });
 
-    const dummy = new THREE.Object3D();
+    const worldAsteroids = [];
+    const refuelStations = [];
+    const celestialBodies = [];
+    const loadedSectors = new Map();
+    const destroyedWorldObjects = new Set();
+    const galacticOrigin = new V3();
+    const galacticCamera = new V3();
+    let currentSectorKey = "";
+    let currentSector = { x: 0, y: 0, z: 0 };
+    let refuelActive = false;
+    let bombRefillTimer = 0;
 
-    for (let i = 0; i < CONFIG.asteroids; i++) {
-      const angle = rand(0, Math.PI * 2);
-      const radius = rand(160, 1500);
+    // A estação original continua sendo um porto de abastecimento no sistema inicial.
+    refuelStations.push({ group: station, radius: 34, starter: true, sectorKey: null });
 
-      dummy.position.set(
-        Math.cos(angle) * radius,
-        rand(-230, 230),
-        Math.sin(angle) * radius - 700
-      );
-
-      dummy.rotation.set(rand(0, 6), rand(0, 6), rand(0, 6));
-      const size = rand(3, 20);
-      dummy.scale.set(size, size * rand(.6, 1.5), size * rand(.7, 1.4));
-      dummy.updateMatrix();
-
-      rocks.setMatrixAt(i, dummy.matrix);
+    function hash32(x, y, z, salt = 0) {
+      let h = (x * 374761393 + y * 668265263 + z * 2147483647 + salt * 1274126177) | 0;
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return (h ^ (h >>> 16)) >>> 0;
     }
 
-    rocks.instanceMatrix.needsUpdate = true;
-    rocks.computeBoundingSphere();
-    scene.add(rocks);
+    function seededRandom(seed) {
+      let state = seed >>> 0;
+      return () => {
+        state += 0x6D2B79F5;
+        let t = state;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function sectorId(x, y, z) {
+      return `${x}:${y}:${z}`;
+    }
+
+    function localFromGalactic(position) {
+      return position.clone().sub(galacticOrigin);
+    }
+
+    function createRefuelStation(position, sectorKey, index = 0) {
+      const group = new THREE.Group();
+      group.position.copy(position);
+
+      mesh(ballGeo, darkMetal, group, [0, 0, 0], [8, 8, 8]);
+      mesh(ballGeo, cyan, group, [0, 0, 0], [3.8, 3.8, 3.8]);
+
+      for (let i = 0; i < 2; i++) {
+        const r = mesh(ringGeo, i ? purple : cyan, group);
+        const radius = 18 + i * 7;
+        r.scale.set(radius, radius, radius);
+        r.rotation.x = i * 1.2;
+      }
+
+      for (let i = 0; i < 4; i++) {
+        const arm = new THREE.Group();
+        arm.rotation.z = i * Math.PI / 2;
+        group.add(arm);
+        mesh(boxGeo, metal, arm, [17, 0, 0], [25, 2.2, 2.2]);
+        mesh(boxGeo, cyan, arm, [29, 0, 0], [2, 5, 5]);
+      }
+
+      scene.add(group);
+      const entry = { group, radius: 32, sectorKey, starter: false, index };
+      refuelStations.push(entry);
+      return entry;
+    }
+
+    function createCelestial(type, position, radius, sectorKey, seed) {
+      const group = new THREE.Group();
+      group.position.copy(position);
+      const random = seededRandom(seed);
+
+      if (type === "sun") {
+        const sunIndex = Math.floor(random() * sunMaterials.length);
+        const body = new THREE.Mesh(celestialGeo, sunMaterials[sunIndex]);
+        body.scale.setScalar(radius);
+        group.add(body);
+
+        const corona = new THREE.Mesh(celestialGeo, sunCoronaMaterials[sunIndex]);
+        corona.scale.setScalar(radius * 1.12);
+        group.add(corona);
+      } else {
+        const body = new THREE.Mesh(
+          celestialGeo,
+          planetMaterials[Math.floor(random() * planetMaterials.length)]
+        );
+        body.scale.set(radius, radius * (0.92 + random() * .12), radius);
+        group.add(body);
+
+        if (random() < .32) {
+          const ring = new THREE.Mesh(planetRingGeo, planetRingMaterial);
+          ring.scale.setScalar(radius * 1.45);
+          ring.rotation.x = Math.PI / 2.6;
+          group.add(ring);
+        }
+      }
+
+      scene.add(group);
+      const entry = { group, type, radius, sectorKey, spin: (random() - .5) * .08 };
+      celestialBodies.push(entry);
+      return entry;
+    }
+
+    function createWorldAsteroid(position, radius, sectorKey, id, random) {
+      if (destroyedWorldObjects.has(id)) return null;
+
+      const asteroid = new THREE.Mesh(rockGeo, rockMaterial);
+      asteroid.position.copy(position);
+      asteroid.scale.set(
+        radius,
+        radius * (.65 + random() * .7),
+        radius * (.7 + random() * .6)
+      );
+      asteroid.rotation.set(random() * 6, random() * 6, random() * 6);
+      scene.add(asteroid);
+
+      const entry = {
+        mesh: asteroid,
+        radius: radius * .9,
+        hp: Math.max(1, Math.ceil(radius / 5)),
+        sectorKey,
+        id,
+        spin: new V3((random() - .5) * .3, (random() - .5) * .3, (random() - .5) * .3),
+        collisionCooldown: 0
+      };
+      worldAsteroids.push(entry);
+      return entry;
+    }
+
+    function generateSector(sx, sy, sz) {
+      const key = sectorId(sx, sy, sz);
+      if (loadedSectors.has(key)) return;
+
+      const random = seededRandom(hash32(sx, sy, sz, 77));
+      const record = { asteroids: [], stations: [], celestial: [] };
+      const size = CONFIG.sectorSize;
+
+      const sectorBase = new V3(sx * size, sy * size, sz * size);
+      const randomGalacticPosition = (margin = 100) => new V3(
+        sectorBase.x + margin + random() * (size - margin * 2),
+        sectorBase.y + margin + random() * (size - margin * 2),
+        sectorBase.z + margin + random() * (size - margin * 2)
+      );
+
+      // Poucos asteroides por setor: colisão e destruição passam a ser individuais.
+      const asteroidCount = Math.floor(random() * (CONFIG.asteroidsPerSector + 1));
+      for (let i = 0; i < asteroidCount; i++) {
+        const id = `A:${key}:${i}`;
+        const galacticPos = randomGalacticPosition(120);
+        const radius = 4 + random() * 10;
+        const asteroid = createWorldAsteroid(
+          localFromGalactic(galacticPos), radius, key, id, random
+        );
+        if (asteroid) record.asteroids.push(asteroid);
+      }
+
+      // Estações são raras, mas frequentes o bastante para sustentar viagens longas.
+      if (random() < .20) {
+        const stationEntry = createRefuelStation(
+          localFromGalactic(randomGalacticPosition(220)), key, 0
+        );
+        record.stations.push(stationEntry);
+      }
+
+      // Corpos celestes de baixa geometria; grandes o bastante para serem marcos visuais.
+      const celestialRoll = random();
+      if (celestialRoll < .09) {
+        record.celestial.push(createCelestial(
+          "sun",
+          localFromGalactic(randomGalacticPosition(320)),
+          90 + random() * 85,
+          key,
+          hash32(sx, sy, sz, 11)
+        ));
+      } else if (celestialRoll < .32) {
+        record.celestial.push(createCelestial(
+          "planet",
+          localFromGalactic(randomGalacticPosition(260)),
+          65 + random() * 95,
+          key,
+          hash32(sx, sy, sz, 19)
+        ));
+      }
+
+      loadedSectors.set(key, record);
+    }
+
+    function removeArrayEntry(array, entry) {
+      const index = array.indexOf(entry);
+      if (index >= 0) array.splice(index, 1);
+    }
+
+    function unloadSector(key) {
+      const record = loadedSectors.get(key);
+      if (!record) return;
+
+      for (const asteroid of record.asteroids) {
+        scene.remove(asteroid.mesh);
+        removeArrayEntry(worldAsteroids, asteroid);
+      }
+      for (const stationEntry of record.stations) {
+        scene.remove(stationEntry.group);
+        removeArrayEntry(refuelStations, stationEntry);
+      }
+      for (const body of record.celestial) {
+        scene.remove(body.group);
+        removeArrayEntry(celestialBodies, body);
+      }
+
+      loadedSectors.delete(key);
+    }
+
+    function refreshSectors(force = false) {
+      galacticCamera.copy(camera.position).add(galacticOrigin);
+      const sx = Math.floor(galacticCamera.x / CONFIG.sectorSize);
+      const sy = Math.floor(galacticCamera.y / CONFIG.sectorSize);
+      const sz = Math.floor(galacticCamera.z / CONFIG.sectorSize);
+      const key = sectorId(sx, sy, sz);
+
+      if (!force && key === currentSectorKey) return;
+      currentSectorKey = key;
+      currentSector = { x: sx, y: sy, z: sz };
+
+      const needed = new Set();
+      for (let x = sx - CONFIG.sectorRadiusXZ; x <= sx + CONFIG.sectorRadiusXZ; x++) {
+        for (let z = sz - CONFIG.sectorRadiusXZ; z <= sz + CONFIG.sectorRadiusXZ; z++) {
+          const sectorKey = sectorId(x, sy, z);
+          needed.add(sectorKey);
+          generateSector(x, sy, z);
+        }
+      }
+
+      for (const loadedKey of Array.from(loadedSectors.keys())) {
+        if (!needed.has(loadedKey)) unloadSector(loadedKey);
+      }
+    }
+
+    function destroyAsteroid(asteroid, award = true) {
+      destroyedWorldObjects.add(asteroid.id);
+      burst(asteroid.mesh.position, 0xffa45c, 55, 34);
+      burst(asteroid.mesh.position, 0x7d8ca8, 35, 18);
+      scene.remove(asteroid.mesh);
+      removeArrayEntry(worldAsteroids, asteroid);
+
+      const record = loadedSectors.get(asteroid.sectorKey);
+      if (record) removeArrayEntry(record.asteroids, asteroid);
+      if (award) score += 35;
+    }
+
+    function rebaseWorldIfNeeded() {
+      if (camera.position.lengthSq() < 4200 * 4200) return;
+
+      const shift = camera.position.clone();
+      galacticOrigin.add(shift);
+      camera.position.sub(shift);
+
+      planet.position.sub(shift);
+      atmosphere.position.sub(shift);
+      station.position.sub(shift);
+
+      for (const drone of drones) drone.group.position.sub(shift);
+      for (const bullet of bullets) {
+        bullet.mesh.position.sub(shift);
+        bullet.previous.sub(shift);
+      }
+      for (const asteroid of worldAsteroids) asteroid.mesh.position.sub(shift);
+      for (const stationEntry of refuelStations) {
+        if (!stationEntry.starter) stationEntry.group.position.sub(shift);
+      }
+      for (const body of celestialBodies) body.group.position.sub(shift);
+      for (const bomb of bombs) bomb.mesh.position.sub(shift);
+
+      for (let i = 0; i < CONFIG.particles; i++) {
+        if (particleLives[i] <= 0) continue;
+        const k = i * 3;
+        particlePositions[k] -= shift.x;
+        particlePositions[k + 1] -= shift.y;
+        particlePositions[k + 2] -= shift.z;
+      }
+      particleGeo.attributes.position.needsUpdate = true;
+    }
 
     // ============================================================
     // COCKPIT
@@ -1538,6 +1837,7 @@
     let active = false, dead = false, started = false;
     let mouseDown = false, hadPointerLock = false;
     let time = 0, score = 0, shield = 100, heat = 0, charge = 100;
+    let fuel = 100, bombCount = CONFIG.maxBombs, bombCooldown = 0;
     let warpTimer = 0, warpVisual = 0, damage = 0, hitTimer = 0;
     let fireCooldown = 0, sinceDamage = 10, overheated = false;
 
@@ -1574,6 +1874,120 @@
 
       if (!enemy) bullet.velocity.add(velocity);
       bullets.push(bullet);
+    }
+
+    // ============================================================
+    // BOMBA DE EMERGÊNCIA
+    // ============================================================
+
+    const bombs = [];
+    const bombGeo = new THREE.IcosahedronGeometry(1.15, 1);
+    const bombMaterial = glow(0xffa63d);
+
+    function isExtremeDanger() {
+      if (shield <= 45) return true;
+
+      let threats = 0;
+      for (const drone of drones) {
+        if (drone.group.visible && drone.group.position.distanceToSquared(camera.position) < 110 * 110) {
+          if (++threats >= 4) return true;
+        }
+      }
+      for (const asteroid of worldAsteroids) {
+        if (asteroid.mesh.position.distanceToSquared(camera.position) < 90 * 90) {
+          if (++threats >= 4) return true;
+        }
+      }
+      return false;
+    }
+
+    function launchBomb() {
+      if (!active || bombCount <= 0 || bombCooldown > 0 || warpTimer > 0) return false;
+      if (!isExtremeDanger()) {
+        ui.message.textContent = "BOMBA BLOQUEADA // SOMENTE EM PERIGO EXTREMO";
+        return false;
+      }
+
+      camera.getWorldDirection(forward);
+      const mesh = new THREE.Mesh(bombGeo, bombMaterial);
+      mesh.position.copy(camera.position).addScaledVector(forward, 4.5);
+      mesh.scale.set(1, 1, 2.2);
+      scene.add(mesh);
+
+      bombs.push({
+        mesh,
+        velocity: forward.clone().multiplyScalar(150).add(velocity),
+        life: 1.35,
+        pulse: 0
+      });
+
+      bombCount--;
+      bombCooldown = 2.2;
+      cockpit.position.z = .16;
+      return true;
+    }
+
+    function detonateBomb(index) {
+      const bomb = bombs[index];
+      if (!bomb) return;
+      const center = bomb.mesh.position.clone();
+      const radius = 240;
+      const radiusSq = radius * radius;
+
+      burst(center, 0xffc85c, 220, 105);
+      burst(center, 0x57e7ff, 160, 80);
+
+      for (let i = worldAsteroids.length - 1; i >= 0; i--) {
+        const asteroid = worldAsteroids[i];
+        if (asteroid.mesh.position.distanceToSquared(center) <= radiusSq) {
+          destroyAsteroid(asteroid, true);
+        }
+      }
+
+      for (const drone of drones) {
+        if (!drone.group.visible || drone.group.position.distanceToSquared(center) > radiusSq) continue;
+        burst(drone.group.position, 0xff5c39, 90, 45);
+        burst(drone.group.position, 0x48eaff, 45, 28);
+        drone.group.visible = false;
+        drone.respawn = rand(3, 5.5);
+        score += 150;
+      }
+
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        if (bullets[i].enemy && bullets[i].mesh.position.distanceToSquared(center) <= radiusSq) {
+          removeBullet(i);
+        }
+      }
+
+      scene.remove(bomb.mesh);
+      bombs.splice(index, 1);
+      damage = Math.max(damage, .16);
+      hitTimer = .18;
+    }
+
+    function updateBombs(dt) {
+      bombCooldown = Math.max(0, bombCooldown - dt);
+
+      for (let i = bombs.length - 1; i >= 0; i--) {
+        const bomb = bombs[i];
+        bomb.life -= dt;
+        bomb.pulse += dt;
+        bomb.mesh.position.addScaledVector(bomb.velocity, dt);
+        bomb.mesh.rotation.z += dt * 5;
+        bomb.mesh.rotation.x += dt * 3;
+        bomb.mesh.scale.x = bomb.mesh.scale.y = 1 + Math.sin(bomb.pulse * 18) * .12;
+
+        let impact = false;
+        for (const asteroid of worldAsteroids) {
+          const r = asteroid.radius + 2;
+          if (asteroid.mesh.position.distanceToSquared(bomb.mesh.position) < r * r) {
+            impact = true;
+            break;
+          }
+        }
+
+        if (impact || bomb.life <= 0) detonateBomb(i);
+      }
     }
 
     // Distância de um ponto a um segmento:
@@ -1665,6 +2079,23 @@
               }
 
               break;
+            }
+          }
+
+          if (!hit) {
+            for (let a = worldAsteroids.length - 1; a >= 0; a--) {
+              const asteroid = worldAsteroids[a];
+              if (segmentDistanceSquared(
+                asteroid.mesh.position, bullet.previous, bullet.mesh.position
+              ) < asteroid.radius * asteroid.radius) {
+                asteroid.hp--;
+                hitTimer = .13;
+                hit = true;
+                burst(bullet.mesh.position, 0xffb45c, 12, 12);
+
+                if (asteroid.hp <= 0) destroyAsteroid(asteroid);
+                break;
+              }
             }
           }
         }
@@ -2038,11 +2469,13 @@
     bindHoldButton("touchFire", "KeyJ");
 
     $("touchWarp").addEventListener("click", () => {
-      if (!active || charge < 100 || warpTimer > 0) return;
+      if (!active || charge < 100 || warpTimer > 0 || fuel <= 0) return;
 
       warpTimer = 2.4;
       charge = 0;
     });
+
+    $("touchBomb").addEventListener("click", launchBomb);
 
     touchControls.addEventListener("contextmenu", event => {
       event.preventDefault();
@@ -2129,6 +2562,11 @@
       shield = 100;
       heat = 0;
       charge = 100;
+      fuel = 100;
+      bombCount = CONFIG.maxBombs;
+      bombCooldown = 0;
+      bombRefillTimer = 0;
+      refuelActive = false;
       warpTimer = 0;
       warpVisual = 0;
       damage = 0;
@@ -2142,6 +2580,7 @@
       keys.clear();
       mouseDown = false;
       velocity.set(0, 0, 0);
+      galacticOrigin.set(0, 0, 0);
       camera.position.set(0, 0, 40);
       camera.quaternion.identity();
       camera.fov = 72;
@@ -2149,6 +2588,19 @@
       cockpit.position.set(0, 0, 0);
 
       while (bullets.length) removeBullet(bullets.length - 1);
+      while (bombs.length) {
+        scene.remove(bombs[bombs.length - 1].mesh);
+        bombs.pop();
+      }
+
+      for (const key of Array.from(loadedSectors.keys())) unloadSector(key);
+      destroyedWorldObjects.clear();
+      currentSectorKey = "";
+
+      // Restaura os marcos do sistema inicial após eventual rebasing.
+      planet.position.set(-1050, 270, -2300);
+      atmosphere.position.copy(planet.position);
+      station.position.set(0, 15, -540);
 
       particleLives.fill(0);
       particleColors.fill(0);
@@ -2156,6 +2608,7 @@
       particleGeo.attributes.color.needsUpdate = true;
 
       drones.forEach((drone, i) => placeDrone(drone, true, i));
+      refreshSectors(true);
     }
 
     ui.start.addEventListener("click", play);
@@ -2163,7 +2616,7 @@
     const handledKeys = new Set([
       "Space", "ControlLeft", "ControlRight",
       "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
-      "KeyW", "KeyA", "KeyS", "KeyD", "KeyJ",
+      "KeyW", "KeyA", "KeyS", "KeyD", "KeyJ", "KeyB",
       "KeyF", "KeyP", "KeyR", "ShiftLeft", "ShiftRight"
     ]);
 
@@ -2194,7 +2647,12 @@
           return;
         }
 
-        if (event.code === "KeyF" && active && charge >= 100) {
+        if (event.code === "KeyB" && active) {
+          launchBomb();
+          return;
+        }
+
+        if (event.code === "KeyF" && active && charge >= 100 && fuel > 0) {
           warpTimer = 2.4;
           charge = 0;
         }
@@ -2274,9 +2732,21 @@
         );
       }
 
+      if (fuel <= 0 && warpTimer <= 0) {
+        desiredVelocity.multiplyScalar(.18);
+      }
+
       desiredVelocity.applyQuaternion(camera.quaternion);
       velocity.lerp(desiredVelocity, 1 - Math.exp(-5 * dt));
       camera.position.addScaledVector(velocity, dt);
+
+      const fuelDrain = warpTimer > 0
+        ? CONFIG.fuelDrainWarp
+        : boosting ? CONFIG.fuelDrainBoost : CONFIG.fuelDrainCruise;
+      if (desiredVelocity.lengthSq() > 4) fuel = Math.max(0, fuel - fuelDrain * dt);
+
+      rebaseWorldIfNeeded();
+      refreshSectors();
 
       warpTimer = Math.max(0, warpTimer - dt);
       if (warpTimer === 0) charge = Math.min(100, charge + dt * 10);
@@ -2310,6 +2780,72 @@
 
       damage = Math.max(0, damage - dt * 1.8);
       hitTimer = Math.max(0, hitTimer - dt);
+    }
+
+    function updateWorldObjects(dt) {
+      refuelActive = false;
+
+      for (let i = worldAsteroids.length - 1; i >= 0; i--) {
+        const asteroid = worldAsteroids[i];
+        asteroid.mesh.rotation.x += asteroid.spin.x * dt;
+        asteroid.mesh.rotation.y += asteroid.spin.y * dt;
+        asteroid.mesh.rotation.z += asteroid.spin.z * dt;
+        asteroid.collisionCooldown = Math.max(0, asteroid.collisionCooldown - dt);
+
+        const collisionRadius = asteroid.radius + 3.2;
+        if (
+          asteroid.collisionCooldown <= 0 &&
+          warpTimer <= 0 &&
+          asteroid.mesh.position.distanceToSquared(camera.position) < collisionRadius * collisionRadius
+        ) {
+          temp.subVectors(camera.position, asteroid.mesh.position);
+          if (temp.lengthSq() < .0001) temp.set(0, 1, 0);
+          temp.normalize();
+
+          const impact = clamp(10 + asteroid.radius * 1.15 + velocity.length() * .055, 12, 38);
+          shield = Math.max(0, shield - impact);
+          sinceDamage = 0;
+          damage = 1;
+          asteroid.collisionCooldown = 1.0;
+          velocity.addScaledVector(temp, 55 + asteroid.radius * 2.5);
+          burst(camera.position, 0xff8c62, 28, 20);
+
+          asteroid.hp--;
+          if (asteroid.hp <= 0) destroyAsteroid(asteroid, false);
+
+          if (shield <= 0) {
+            dead = true;
+            pause();
+            return;
+          }
+        }
+      }
+
+      for (const stationEntry of refuelStations) {
+        if (!stationEntry.group.parent) continue;
+        if (!stationEntry.starter) stationEntry.group.rotation.y += dt * .18;
+
+        const range = stationEntry.radius + 18;
+        if (stationEntry.group.position.distanceToSquared(camera.position) > range * range) continue;
+
+        refuelActive = true;
+        fuel = Math.min(100, fuel + dt * 30);
+        shield = Math.min(100, shield + dt * 16);
+        charge = Math.min(100, charge + dt * 32);
+        heat = Math.max(0, heat - dt * 45);
+        bombRefillTimer += dt;
+
+        if (bombCount < CONFIG.maxBombs && bombRefillTimer >= 2.25) {
+          bombCount++;
+          bombRefillTimer = 0;
+        }
+      }
+
+      if (!refuelActive) bombRefillTimer = 0;
+
+      for (const body of celestialBodies) {
+        body.group.rotation.y += body.spin * dt;
+      }
     }
 
     function updateDrones(dt) {
@@ -2371,25 +2907,31 @@
     function updateHUD() {
       ui.score.textContent = `${String(score).padStart(6, "0")} PTS`;
       ui.speed.textContent = `${String(Math.round(velocity.length())).padStart(3, "0")} M/S`;
-      ui.sector.textContent = `DISTÂNCIA ${Math.round(camera.position.length())} M`;
+      ui.sector.textContent = `SETOR ${currentSector.x}.${currentSector.y}.${currentSector.z}`;
 
       ui.shield.style.transform = `scaleX(${shield / 100})`;
       ui.heat.style.transform = `scaleX(${heat / 100})`;
       ui.warp.style.transform = `scaleX(${charge / 100})`;
+      ui.fuel.style.transform = `scaleX(${fuel / 100})`;
+      ui.bomb.style.transform = `scaleX(${bombCount / CONFIG.maxBombs})`;
 
       ui.shieldValue.textContent = `${Math.ceil(shield)}%`;
       ui.heatValue.textContent = `${Math.round(heat)}%`;
       ui.warpValue.textContent = `${Math.floor(charge)}%`;
+      ui.fuelValue.textContent = `${Math.ceil(fuel)}%`;
+      ui.bombValue.textContent = `${bombCount}/${CONFIG.maxBombs}`;
 
       ui.reticle.classList.toggle("hit", hitTimer > 0);
 
       ui.message.textContent =
+        refuelActive ? "ESTAÇÃO // REABASTECENDO SISTEMAS" :
         warpTimer > 0 ? "HIPERVELOCIDADE // CAMPO ATIVO" :
+        fuel <= 8 ? "ALERTA // COMBUSTÍVEL CRÍTICO" :
         overheated ? "ARMAS SUPERAQUECIDAS" :
-        shield < 30 ? "ALERTA // ESCUDO CRÍTICO" :
+        shield < 30 ? `PERIGO EXTREMO // BOMBA [ B ] ${bombCount}/${CONFIG.maxBombs}` :
         charge >= 100 ? "SALTO DISPONÍVEL [ F ]" : "RECARREGANDO NÚCLEO";
 
-      ui.message.style.color = overheated || shield < 30 ? "#ff668b" : "#63f7ff";
+      ui.message.style.color = overheated || shield < 30 || fuel <= 8 ? "#ff668b" : "#63f7ff";
 
       radar.clearRect(0, 0, 240, 240);
 
@@ -2459,6 +3001,18 @@
             };
           }
         }
+      }
+
+      for (const stationEntry of refuelStations) {
+        if (!stationEntry.group.parent) continue;
+        radarVector.subVectors(stationEntry.group.position, camera.position)
+          .applyQuaternion(inverseQuaternion);
+        let sx = radarVector.x * .42;
+        let sy = radarVector.z * .42;
+        const sl = Math.hypot(sx, sy);
+        if (sl > 108) { sx *= 108 / sl; sy *= 108 / sl; }
+        radar.fillStyle = "#5dffb0";
+        radar.fillRect(118 + sx, 118 + sy, 4, 4);
       }
 
       radar.fillStyle = "#9bffff";
@@ -2561,8 +3115,10 @@
         time += dt;
 
         updatePlayer(dt);
+        updateWorldObjects(dt);
         updateDrones(dt);
         updateBullets(dt);
+        updateBombs(dt);
         updateParticles(dt);
         updateEnvironment(dt);
       } else if (!started) {
@@ -2578,114 +3134,5 @@
 
     requestAnimationFrame(frame);
   </script>
-
-
-
-
-<script>
-
-const CHUNK_SIZE = 4000;
-const activeChunks = new Map(); // key: "x,y,z" -> {objects, seed}
-
-function getChunkKey(pos) {
-  const cx = Math.floor(pos.x / CHUNK_SIZE);
-  const cy = Math.floor(pos.y / CHUNK_SIZE);
-  const cz = Math.floor(pos.z / CHUNK_SIZE);
-  return `${cx},${cy},${cz}`;
-}
-
-function updateChunks(playerPos) {
-  const centerKey = getChunkKey(playerPos);
-  const [cx, cy, cz] = centerKey.split(',').map(Number);
-
-  const neededKeys = new Set();
-  for (let dx = -1; dx <= 1; dx++)
-    for (let dy = -1; dy <= 1; dy++)
-      for (let dz = -1; dz <= 1; dz++) {
-        const key = `${cx+dx},${cy+dy},${cz+dz}`;
-        neededKeys.add(key);
-        if (!activeChunks.has(key)) spawnChunk(key, dx+cx, dy+cy, dz+cz);
-      }
-
-  // Remove chunks distantes
-  for (const key of activeChunks.keys()) {
-    if (!neededKeys.has(key)) despawnChunk(key);
-  }
-}
-
-function spawnChunk(key, cx, cy, cz) {
-  const seed = hashSeed(cx, cy, cz);
-  const rng = new SeededRandom(seed);
-
-  const objects = [];
-  if (rng.next() < 0.15) objects.push(spawnPlanet(rng, cx, cy, cz));
-  if (rng.next() < 0.05) objects.push(spawnSun(rng, cx, cy, cz));
-  if (rng.next() < 0.30) objects.push(spawnEnemyShip(rng, cx, cy, cz));
-  if (rng.next() < 0.10) objects.push(spawnRefuelStation(rng, cx, cy, cz));
-
-  activeChunks.set(key, objects);
-}
-
-
-
-
-
-function checkRefuelStation(player, stations) {
-  stations.forEach(station => {
-    if (player.position.distanceTo(station.position) < station.radius) {
-      player.shield = Math.min(100, player.shield + 0.5);
-      player.temperature = Math.max(0, player.temperature - 0.3);
-      updateHUD();
-    }
-  });
-}
-
-
-
-
-const missile = {
-  cooldown: 0,
-  maxCooldown: 8000, // ms
-  radius: 350,        // raio de explosão
-  damage: 100
-};
-
-function fireMissile(playerPos, direction) {
-  if (missile.cooldown > 0) return;
-  missile.cooldown = missile.maxCooldown;
-
-  const proj = createMissileMesh(playerPos, direction);
-  proj.speed = 40;
-  activeMissiles.push(proj);
-}
-
-function updateMissiles(delta, enemies) {
-  activeMissiles.forEach((m, i) => {
-    m.position.addScaledVector(m.direction, m.speed * delta);
-
-    // Colidiu com algo ou tempo de vida acabou -> explode
-    if (m.lifetime <= 0 || hitSomething(m)) {
-      explodeMissile(m.position, enemies);
-      removeMissile(i);
-    }
-  });
-}
-
-function explodeMissile(center, enemies) {
-  spawnExplosionVFX(center, missile.radius); // partículas, luz, shake de câmera
-
-  enemies.forEach(enemy => {
-    const dist = enemy.position.distanceTo(center);
-    if (dist < missile.radius) {
-      const falloff = 1 - (dist / missile.radius); // dano decai com distância
-      enemy.takeDamage(missile.damage * falloff);
-    }
-  });
-}
-
-
-</script>
-
-
 </body>
 </html>
