@@ -744,7 +744,7 @@
           CLIQUE ou J — disparar / SHIFT — turbo<br>
           B — bomba de emergência / V — alternar 1ª/3ª pessoa<br>
           F — hipervelocidade / P — pausa / R — reiniciar<br>
-          JOYPAD XBOX — esquerdo mirar · direito mover · RT avançar · LT turbo · RB atirar<br>
+          JOYPAD XBOX — esquerdo mirar · direito mover · A/RB atirar · B bomba · RT avançar · LT turbo<br>
           A subir · X descer · B bomba · Y visão · LB salto · MENU pausa
         </div>
 
@@ -2719,12 +2719,14 @@
       gamepadInput.moveX = normalizeGamepadAxis(gamepad.axes[2] || 0);
       gamepadInput.moveY = normalizeGamepadAxis(gamepad.axes[3] || 0);
 
-      // Xbox padrão: A subir, X descer, LT turbo, RT avançar, RB atirar.
-      gamepadInput.up = gamepadButtonPressed(gamepad, 0);
+      // Xbox padrão: A/RB atirar, B bomba, X descer, LT turbo, RT avançar.
+      gamepadInput.up = false;
       gamepadInput.down = gamepadButtonPressed(gamepad, 2);
       gamepadInput.boost = gamepadButtonPressed(gamepad, 6, .12);
       gamepadInput.forward = gamepadButtonPressed(gamepad, 7, .12);
-      gamepadInput.fire = gamepadButtonPressed(gamepad, 5);
+      gamepadInput.fire =
+        gamepadButtonPressed(gamepad, 0) ||
+        gamepadButtonPressed(gamepad, 5);
 
       const bombPressed = gamepadButtonDownOnce(gamepad, 1);
       const viewPressed = gamepadButtonDownOnce(gamepad, 3);
