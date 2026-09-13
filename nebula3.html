@@ -415,10 +415,19 @@
       accent-color: #63f7ff;
     }
 
-    #bgMusic {
+    #bgMusic,
+    #youtubeMusic {
       display: block;
       width: 100%;
       margin-top: 12px;
+    }
+
+    #youtubeMusic {
+      aspect-ratio: 16 / 9;
+      min-height: 200px;
+      border: 1px solid #64ecff44;
+      border-radius: 6px;
+      background: #02040b;
     }
 
     #musicStatus {
@@ -760,6 +769,7 @@
 
         <label for="musicSelect">Trilha de fundo</label>
         <select id="musicSelect">
+          <option value="youtube:huXVnd-QnNs" selected>Trilha padrão — YouTube</option>
           <option value="">Sem trilha sonora</option>
         </select>
 
@@ -774,10 +784,20 @@
           loop
           preload="metadata"
           aria-label="Prévia e controles da trilha sonora"
+          hidden
         ></audio>
 
+        <iframe
+          id="youtubeMusic"
+          title="Player da trilha sonora padrão no YouTube"
+          src="https://www.youtube-nocookie.com/embed/huXVnd-QnNs?enablejsapi=1&controls=1&rel=0"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        ></iframe>
+
         <p id="musicStatus" role="status" aria-live="polite">
-          Escolha uma ou mais músicas. Os arquivos não são enviados a um servidor.
+          Trilha padrão do YouTube selecionada. Ela começará ao iniciar a missão.
         </p>
 
         <label class="check-row">
@@ -2170,6 +2190,12 @@
     const musicEnabled = $("musicEnabled");
     const musicStatus = $("musicStatus");
     const bgMusic = $("bgMusic");
+    const youtubeMusic = $("youtubeMusic");
+    const DEFAULT_YOUTUBE_ID = "huXVnd-QnNs";
+    const DEFAULT_YOUTUBE_PREVIEW =
+      `https://www.youtube-nocookie.com/embed/${DEFAULT_YOUTUBE_ID}?enablejsapi=1&controls=1&rel=0`;
+    const DEFAULT_YOUTUBE_PLAYING =
+      `https://www.youtube-nocookie.com/embed/${DEFAULT_YOUTUBE_ID}?autoplay=1&loop=1&playlist=${DEFAULT_YOUTUBE_ID}&enablejsapi=1&controls=1&rel=0`;
 
     const musicURLs = new Set();
     let musicAttempt = 0;
@@ -2177,6 +2203,10 @@
     function stopMusic() {
       musicAttempt++;
       bgMusic.pause();
+
+      if (youtubeMusic.src !== DEFAULT_YOUTUBE_PREVIEW) {
+        youtubeMusic.src = DEFAULT_YOUTUBE_PREVIEW;
+      }
     }
 
     async function startMusic() {
@@ -2185,6 +2215,23 @@
         return;
       }
 
+      const selectedMusic = musicSelect.value;
+
+      if (selectedMusic.startsWith("youtube:")) {
+        bgMusic.pause();
+        bgMusic.hidden = true;
+        youtubeMusic.hidden = false;
+
+        if (youtubeMusic.src !== DEFAULT_YOUTUBE_PLAYING) {
+          youtubeMusic.src = DEFAULT_YOUTUBE_PLAYING;
+        }
+
+        musicStatus.textContent =
+          "Tocando a trilha padrão pelo player oficial do YouTube.";
+        return;
+      }
+
+      youtubeMusic.hidden = true;
       const attempt = ++musicAttempt;
 
       try {
@@ -2215,12 +2262,29 @@
       const url = musicSelect.value;
 
       if (!url) {
+        bgMusic.hidden = true;
+        youtubeMusic.hidden = true;
         bgMusic.removeAttribute("src");
         bgMusic.load();
         musicStatus.textContent = "Trilha sonora desativada.";
         return;
       }
 
+      if (url.startsWith("youtube:")) {
+        bgMusic.hidden = true;
+        youtubeMusic.hidden = false;
+        youtubeMusic.src = active && musicEnabled.checked
+          ? DEFAULT_YOUTUBE_PLAYING
+          : DEFAULT_YOUTUBE_PREVIEW;
+        musicStatus.textContent =
+          active
+            ? "Tocando a trilha padrão pelo player oficial do YouTube."
+            : "Trilha padrão do YouTube selecionada. Ela começará ao iniciar a missão.";
+        return;
+      }
+
+      youtubeMusic.hidden = true;
+      bgMusic.hidden = false;
       bgMusic.src = url;
       bgMusic.load();
 
@@ -2244,6 +2308,7 @@
       musicURLs.clear();
 
       musicSelect.replaceChildren(
+        new Option("Trilha padrão — YouTube", "youtube:huXVnd-QnNs"),
         new Option("Sem trilha sonora", "")
       );
 
@@ -2253,7 +2318,7 @@
         musicSelect.add(new Option(file.name, url));
       }
 
-      musicSelect.selectedIndex = 1;
+      musicSelect.selectedIndex = 2;
       selectMusic();
 
       // Permite selecionar novamente os mesmos arquivos.
