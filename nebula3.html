@@ -744,7 +744,7 @@
           CLIQUE ou J — disparar / SHIFT — turbo<br>
           B — bomba de emergência / V — alternar 1ª/3ª pessoa<br>
           F — hipervelocidade / P — pausa / R — reiniciar<br>
-          JOYPAD XBOX — analógicos mover/mirar · RT atirar · LT turbo<br>
+          JOYPAD XBOX — esquerdo mirar · direito mover · RT avançar · LT turbo · RB atirar<br>
           A subir · X descer · B bomba · Y visão · LB salto · MENU pausa
         </div>
 
@@ -1918,6 +1918,7 @@
       up: false,
       down: false,
       boost: false,
+      forward: false,
       fire: false,
       previousButtons: []
     };
@@ -1941,6 +1942,7 @@
       gamepadInput.up = false;
       gamepadInput.down = false;
       gamepadInput.boost = false;
+      gamepadInput.forward = false;
       gamepadInput.fire = false;
       gamepadInput.previousButtons = [];
 
@@ -2717,13 +2719,12 @@
       gamepadInput.moveX = normalizeGamepadAxis(gamepad.axes[2] || 0);
       gamepadInput.moveY = normalizeGamepadAxis(gamepad.axes[3] || 0);
 
-      // Xbox padrão: A subir, X descer, LT turbo, RT/RB atirar.
+      // Xbox padrão: A subir, X descer, LT turbo, RT avançar, RB atirar.
       gamepadInput.up = gamepadButtonPressed(gamepad, 0);
       gamepadInput.down = gamepadButtonPressed(gamepad, 2);
       gamepadInput.boost = gamepadButtonPressed(gamepad, 6, .12);
-      gamepadInput.fire =
-        gamepadButtonPressed(gamepad, 7, .12) ||
-        gamepadButtonPressed(gamepad, 5);
+      gamepadInput.forward = gamepadButtonPressed(gamepad, 7, .12);
+      gamepadInput.fire = gamepadButtonPressed(gamepad, 5);
 
       const bombPressed = gamepadButtonDownOnce(gamepad, 1);
       const viewPressed = gamepadButtonDownOnce(gamepad, 3);
@@ -3021,7 +3022,7 @@
       );
 
       const forwardInput = clamp(
-        axis("KeyS", "KeyW") + gamepadInput.moveY,
+        axis("KeyS", "KeyW") + gamepadInput.moveY - Number(gamepadInput.forward),
         -1, 1
       );
 
