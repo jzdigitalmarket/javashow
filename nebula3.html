@@ -2998,7 +2998,7 @@
 
       pitch += (
         axis("ArrowUp", "ArrowDown") * 1.25 +
-        gamepadInput.aimY * 1.65
+        -gamepadInput.aimY * 1.65
       ) * dt;
       pitch = clamp(pitch, -1.48, 1.48);
 
