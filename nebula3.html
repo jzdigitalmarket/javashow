@@ -743,7 +743,9 @@
           ESPAÇO / CTRL — subir e descer<br>
           CLIQUE ou J — disparar / SHIFT — turbo<br>
           B — bomba de emergência / V — alternar 1ª/3ª pessoa<br>
-          F — hipervelocidade / P — pausa / R — reiniciar
+          F — hipervelocidade / P — pausa / R — reiniciar<br>
+          JOYPAD XBOX — analógicos mover/mirar · RT atirar · LT turbo<br>
+          A subir · X descer · B bomba · Y visão · LB salto · MENU pausa
         </div>
 
         <div id="touchHelp">
@@ -804,6 +806,10 @@
           <input id="touchEnabled" type="checkbox" />
           <span>Exibir controles de toque</span>
         </label>
+
+        <p id="gamepadStatus" role="status" aria-live="polite">
+          Joypad: aguardando conexão.
+        </p>
       </fieldset>
 
       <button id="start" disabled>CARREGANDO SISTEMAS...</button>
@@ -1900,6 +1906,50 @@
     // ============================================================
 
     const keys = new Set();
+
+    // Estado do joypad padrão (layout Xbox / Standard Gamepad).
+    const gamepadInput = {
+      connected: false,
+      index: -1,
+      moveX: 0,
+      moveY: 0,
+      aimX: 0,
+      aimY: 0,
+      up: false,
+      down: false,
+      boost: false,
+      fire: false,
+      previousButtons: []
+    };
+
+    const GAMEPAD_DEAD_ZONE = 0.18;
+
+    function normalizeGamepadAxis(value) {
+      const magnitude = Math.abs(value);
+
+      if (magnitude <= GAMEPAD_DEAD_ZONE) return 0;
+
+      return Math.sign(value) *
+        (magnitude - GAMEPAD_DEAD_ZONE) / (1 - GAMEPAD_DEAD_ZONE);
+    }
+
+    function clearGamepadInput(keepConnection = true) {
+      gamepadInput.moveX = 0;
+      gamepadInput.moveY = 0;
+      gamepadInput.aimX = 0;
+      gamepadInput.aimY = 0;
+      gamepadInput.up = false;
+      gamepadInput.down = false;
+      gamepadInput.boost = false;
+      gamepadInput.fire = false;
+      gamepadInput.previousButtons = [];
+
+      if (!keepConnection) {
+        gamepadInput.connected = false;
+        gamepadInput.index = -1;
+      }
+    }
+
     const velocity = new V3();
     const desiredVelocity = new V3();
     const forward = new V3();
@@ -2613,6 +2663,111 @@
     // INPUT, PAUSA E REINÍCIO
     // ============================================================
 
+    const gamepadStatus = $("gamepadStatus");
+
+    function setGamepadStatus(message) {
+      gamepadStatus.textContent = `Joypad: ${message}`;
+    }
+
+    function gamepadButtonPressed(gamepad, index, threshold = .5) {
+      const button = gamepad.buttons[index];
+      return Boolean(button && (button.pressed || button.value > threshold));
+    }
+
+    function gamepadButtonDownOnce(gamepad, index) {
+      const pressed = gamepadButtonPressed(gamepad, index);
+      const wasPressed = Boolean(gamepadInput.previousButtons[index]);
+      gamepadInput.previousButtons[index] = pressed;
+      return pressed && !wasPressed;
+    }
+
+    function findActiveGamepad() {
+      if (!navigator.getGamepads) return null;
+
+      const pads = navigator.getGamepads();
+
+      if (gamepadInput.index >= 0 && pads[gamepadInput.index]) {
+        return pads[gamepadInput.index];
+      }
+
+      return Array.from(pads).find(Boolean) || null;
+    }
+
+    function pollGamepad() {
+      const gamepad = findActiveGamepad();
+
+      if (!gamepad) {
+        if (gamepadInput.connected) {
+          clearGamepadInput(false);
+          setGamepadStatus("desconectado.");
+        }
+        return;
+      }
+
+      if (!gamepadInput.connected || gamepadInput.index !== gamepad.index) {
+        clearGamepadInput();
+        gamepadInput.connected = true;
+        gamepadInput.index = gamepad.index;
+        setGamepadStatus(`conectado — ${gamepad.id}`);
+      }
+
+      gamepadInput.moveX = normalizeGamepadAxis(gamepad.axes[0] || 0);
+      gamepadInput.moveY = normalizeGamepadAxis(gamepad.axes[1] || 0);
+      gamepadInput.aimX = normalizeGamepadAxis(gamepad.axes[2] || 0);
+      gamepadInput.aimY = normalizeGamepadAxis(gamepad.axes[3] || 0);
+
+      // Xbox padrão: A subir, X descer, LT turbo, RT/RB atirar.
+      gamepadInput.up = gamepadButtonPressed(gamepad, 0);
+      gamepadInput.down = gamepadButtonPressed(gamepad, 2);
+      gamepadInput.boost = gamepadButtonPressed(gamepad, 6, .12);
+      gamepadInput.fire =
+        gamepadButtonPressed(gamepad, 7, .12) ||
+        gamepadButtonPressed(gamepad, 5);
+
+      const bombPressed = gamepadButtonDownOnce(gamepad, 1);
+      const viewPressed = gamepadButtonDownOnce(gamepad, 3);
+      const warpPressed = gamepadButtonDownOnce(gamepad, 4);
+      const resetPressed = gamepadButtonDownOnce(gamepad, 8);
+      const menuPressed = gamepadButtonDownOnce(gamepad, 9);
+
+      if (menuPressed) {
+        if (started && !dead) {
+          active ? pause() : play();
+        } else {
+          play();
+        }
+        return;
+      }
+
+      if (!active) return;
+
+      if (bombPressed) launchBomb();
+      if (viewPressed) toggleView();
+
+      if (warpPressed && charge >= 100 && warpTimer <= 0 && fuel > 0) {
+        warpTimer = 2.4;
+        charge = 0;
+      }
+
+      if (resetPressed) {
+        reset();
+        play();
+      }
+    }
+
+    window.addEventListener("gamepadconnected", event => {
+      gamepadInput.connected = true;
+      gamepadInput.index = event.gamepad.index;
+      clearGamepadInput();
+      setGamepadStatus(`conectado — ${event.gamepad.id}`);
+    });
+
+    window.addEventListener("gamepaddisconnected", event => {
+      if (event.gamepad.index !== gamepadInput.index) return;
+      clearGamepadInput(false);
+      setGamepadStatus("desconectado.");
+    });
+
     function requestMouse() {
       if (touchEnabled.checked) return;
 
@@ -2637,8 +2792,8 @@
       syncControlUI();
       startMusic();
 
-      // Não captura o mouse quando a interface touch está habilitada.
-      if (!touchEnabled.checked) {
+      // Não captura o mouse ao iniciar pelo joypad ou pela interface touch.
+      if (!touchEnabled.checked && !gamepadInput.connected) {
         requestMouse();
       }
     }
@@ -2649,6 +2804,7 @@
 
       keys.clear();
       clearTouchInput();
+      clearGamepadInput();
 
       stopMusic();
       syncControlUI();
@@ -2680,6 +2836,7 @@
 
     function reset() {
       clearTouchInput();
+      clearGamepadInput();
 
       score = 0;
       shield = 100;
@@ -2835,20 +2992,51 @@
       const axis = (positive, negative) =>
         Number(inputDown(positive)) - Number(inputDown(negative));
 
-      yaw += axis("ArrowLeft", "ArrowRight") * dt * 1.45;
-      pitch += axis("ArrowUp", "ArrowDown") * dt * 1.25;
+      yaw += (
+        axis("ArrowLeft", "ArrowRight") * 1.45 +
+        gamepadInput.aimX * 1.9
+      ) * dt;
+
+      pitch += (
+        axis("ArrowUp", "ArrowDown") * 1.25 +
+        gamepadInput.aimY * 1.65
+      ) * dt;
       pitch = clamp(pitch, -1.48, 1.48);
 
       rotation.set(pitch, yaw, 0);
       camera.quaternion.setFromEuler(rotation);
 
-      const boosting = inputDown("ShiftLeft") || inputDown("ShiftRight");
-      const descending = inputDown("ControlLeft") || inputDown("ControlRight");
+      const boosting =
+        inputDown("ShiftLeft") ||
+        inputDown("ShiftRight") ||
+        gamepadInput.boost;
+
+      const descending =
+        inputDown("ControlLeft") ||
+        inputDown("ControlRight") ||
+        gamepadInput.down;
+
+      const strafeInput = clamp(
+        axis("KeyD", "KeyA") + gamepadInput.moveX,
+        -1, 1
+      );
+
+      const forwardInput = clamp(
+        axis("KeyS", "KeyW") + gamepadInput.moveY,
+        -1, 1
+      );
+
+      const verticalInput = clamp(
+        Number(inputDown("Space")) +
+        Number(gamepadInput.up) -
+        Number(descending),
+        -1, 1
+      );
 
       desiredVelocity.set(
-        axis("KeyD", "KeyA"),
-        Number(inputDown("Space")) - Number(descending),
-        axis("KeyS", "KeyW")
+        strafeInput,
+        verticalInput,
+        forwardInput
       );
 
       if (desiredVelocity.lengthSq() > 1) desiredVelocity.normalize();
@@ -2891,7 +3079,7 @@
       camera.updateProjectionMatrix();
 
       cockpit.rotation.z = THREE.MathUtils.lerp(
-        cockpit.rotation.z, -axis("KeyD", "KeyA") * .08,
+        cockpit.rotation.z, -strafeInput * .08,
         1 - Math.exp(-6 * dt)
       );
 
@@ -2899,8 +3087,8 @@
       cockpit.position.y = Math.sin(time * 2) * .008;
 
       if (thirdPerson) {
-        const strafe = axis("KeyD", "KeyA");
-        const vertical = Number(inputDown("Space")) - Number(descending);
+        const strafe = strafeInput;
+        const vertical = verticalInput;
         shipExterior.rotation.z = THREE.MathUtils.lerp(
           shipExterior.rotation.z, -strafe * .24, 1 - Math.exp(-7 * dt)
         );
@@ -2919,7 +3107,7 @@
       heat = Math.max(0, heat - dt * 22);
       if (overheated && heat < 30) overheated = false;
 
-      if (mouseDown || inputDown("KeyJ")) fire();
+      if (mouseDown || inputDown("KeyJ") || gamepadInput.fire) fire();
 
       sinceDamage += dt;
       if (sinceDamage > 4) shield = Math.min(100, shield + dt * 5);
@@ -3257,6 +3445,8 @@
       // Delta limitado para evitar saltos após travamentos ou troca de aba.
       const dt = Math.min((now - lastTime) / 1000, .033);
       lastTime = now;
+
+      pollGamepad();
 
       if (active) {
         time += dt;
