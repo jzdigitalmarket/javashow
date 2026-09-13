@@ -2711,10 +2711,11 @@
         setGamepadStatus(`conectado — ${gamepad.id}`);
       }
 
-      gamepadInput.moveX = normalizeGamepadAxis(gamepad.axes[0] || 0);
-      gamepadInput.moveY = normalizeGamepadAxis(gamepad.axes[1] || 0);
-      gamepadInput.aimX = normalizeGamepadAxis(gamepad.axes[2] || 0);
-      gamepadInput.aimY = normalizeGamepadAxis(gamepad.axes[3] || 0);
+      // Analógico esquerdo: mirar. Analógico direito: movimentar.
+      gamepadInput.aimX = normalizeGamepadAxis(gamepad.axes[0] || 0);
+      gamepadInput.aimY = normalizeGamepadAxis(gamepad.axes[1] || 0);
+      gamepadInput.moveX = normalizeGamepadAxis(gamepad.axes[2] || 0);
+      gamepadInput.moveY = normalizeGamepadAxis(gamepad.axes[3] || 0);
 
       // Xbox padrão: A subir, X descer, LT turbo, RT/RB atirar.
       gamepadInput.up = gamepadButtonPressed(gamepad, 0);
