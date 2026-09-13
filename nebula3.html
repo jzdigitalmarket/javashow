@@ -2992,7 +2992,7 @@
 
       yaw += (
         axis("ArrowLeft", "ArrowRight") * 1.45 +
-        gamepadInput.aimX * 1.9
+        -gamepadInput.aimX * 1.9
       ) * dt;
 
       pitch += (
