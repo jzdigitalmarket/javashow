@@ -241,6 +241,37 @@
     #eventFeed.alert { color: #ff7898; border-color: #ff557a99; }
     #eventFeed.ally { color: #72ffc4; border-color: #57f0a199; }
 
+    #civilizationPanel {
+      position: absolute;
+      top: 112px;
+      right: 28px;
+      width: 250px;
+      padding: 14px 16px;
+      border: 1px solid #9d7cff55;
+      background: linear-gradient(135deg, #100b22d9, #031624c9);
+      color: #b8d9e7;
+      font-size: 9px;
+      line-height: 1.65;
+      letter-spacing: 1px;
+      backdrop-filter: blur(6px);
+    }
+
+    #civilizationPanel strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #d4c1ff;
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+
+    #civilizationPanel .civ-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 12px;
+    }
+
+    #civilizationPanel .civ-value { color: #72ffc4; text-align: right; }
+
     #overlay {
       position: fixed;
       inset: 0;
@@ -317,6 +348,7 @@
       #radar { width: 120px; height: 120px; }
       #hint { display: none; }
       #eventFeed { bottom: 22px; width: 68vw; font-size: 9px; letter-spacing: 1px; }
+      #civilizationPanel { display: none; }
       .panel { padding: 25px; }
     }
 
@@ -650,6 +682,8 @@
       letter-spacing: 1px;
     }
 
+    body.touch-ui #civilizationPanel { display: none; }
+
     body.touch-ui #touchHelp {
       display: block;
     }
@@ -744,7 +778,7 @@
         <div class="track"><div id="fuelBar" class="fill"></div></div>
       </div>
       <div class="meter">
-        <div class="label"><span>BOMBA / B</span><span id="bombValue">2/2</span></div>
+        <div class="label"><span>BOMBA / B / RMB</span><span id="bombValue">2/2</span></div>
         <div class="track"><div id="bombBar" class="fill"></div></div>
       </div>
     </div>
@@ -756,11 +790,24 @@
 
     <div id="hint">
       WASD · ESPAÇO / CTRL · SHIFT TURBO<br>
-      MOUSE / SETAS MIRAR · J ATIRAR · B BOMBA · V VISÃO · F SALTO · P PAUSA
+      MOUSE / SETAS MIRAR · J/ESQUERDO ATIRAR · B/DIREITO BOMBA · V VISÃO · F SALTO · P PAUSA
     </div>
 
     <div id="eventFeed" role="status" aria-live="polite">
       COMANDO // CANAL TÁTICO CONECTADO
+    </div>
+
+    <div id="civilizationPanel">
+      <strong id="civTitle">PLANETA AURORA // COLÔNIA</strong>
+      <div class="civ-grid">
+        <span>POPULAÇÃO</span><span id="civPopulation" class="civ-value">1,20 BI</span>
+        <span>GOVERNO</span><span id="civGovernment" class="civ-value">CONSELHO</span>
+        <span>ECONOMIA</span><span id="civEconomy" class="civ-value">18</span>
+        <span>COMÉRCIO</span><span id="civTrade" class="civ-value">8</span>
+        <span>CULTURA</span><span id="civCulture" class="civ-value">16</span>
+        <span>TECNOLOGIA</span><span id="civTechnology" class="civ-value">12</span>
+        <span>ESTABILIDADE</span><span id="civStability" class="civ-value">72%</span>
+      </div>
     </div>
   </div>
 
@@ -778,8 +825,8 @@
         <div id="desktopHelp">
           WASD — movimentar / MOUSE ou SETAS — mirar<br>
           ESPAÇO / CTRL — subir e descer<br>
-          CLIQUE ou J — disparar / SHIFT — turbo<br>
-          B — bomba de emergência / V — alternar 1ª/3ª pessoa<br>
+          CLIQUE ESQUERDO ou J — disparar / SHIFT — turbo<br>
+          CLIQUE DIREITO ou B — bomba / V — alternar 1ª/3ª pessoa<br>
           F — hipervelocidade / P — pausa / R — reiniciar<br>
           JOYPAD XBOX — esquerdo mirar · direito mover · A/RB atirar · B bomba · RT avançar · LT turbo<br>
           A subir · X descer · B bomba · Y visão · LB salto · MENU pausa
@@ -972,6 +1019,7 @@
       drones: 9,
       allies: 3,
       bossHp: 42,
+      mothershipHp: 180,
       cruiseSpeed: 48,
       boostSpeed: 145,
       warpSpeed: 620
@@ -986,6 +1034,10 @@
       overlay: $("overlay"), title: $("title"), description: $("description"),
       start: $("start"), status: $("status"), message: $("message"),
       eventFeed: $("eventFeed"),
+      civTitle: $("civTitle"), civPopulation: $("civPopulation"),
+      civGovernment: $("civGovernment"), civEconomy: $("civEconomy"),
+      civTrade: $("civTrade"), civCulture: $("civCulture"),
+      civTechnology: $("civTechnology"), civStability: $("civStability"),
       score: $("score"), speed: $("speed"), sector: $("sector"),
       shield: $("shieldBar"), heat: $("heatBar"), warp: $("warpBar"),
       fuel: $("fuelBar"), bomb: $("bombBar"),
@@ -1238,6 +1290,9 @@
     const planet = new THREE.Mesh(
       new THREE.SphereGeometry(570, 96, 64),
       new THREE.ShaderMaterial({
+        uniforms: {
+          civilizationLevel: { value: .16 }
+        },
         vertexShader: `
           varying vec3 vNormal, vWorld, vLocal;
           void main() {
@@ -1248,6 +1303,7 @@
           }
         `,
         fragmentShader: `
+          uniform float civilizationLevel;
           varying vec3 vNormal, vWorld, vLocal;
           ${noiseGLSL}
 
@@ -1266,8 +1322,10 @@
             float clouds = smoothstep(.57, .74, fbm(vLocal * 13. + 15.));
             color = mix(color, vec3(.62, .8, .9) * (.1 + light), clouds * .75);
 
-            float cities = pow(max(0., noise3(vLocal * 210.) - .66) * 3., 4.);
-            color += vec3(.1, .85, 1.4) * cities * continents * (1. - light);
+            float cityThreshold = mix(.72, .57, civilizationLevel);
+            float cities = pow(max(0., noise3(vLocal * 210.) - cityThreshold) * 3., 3.5);
+            color += vec3(.1, .85, 1.4) * cities * continents * (1. - light)
+                   * mix(.55, 1.8, civilizationLevel);
 
             float rim = pow(1. - max(dot(n, view), 0.), 3.);
             color += vec3(.02, .19, .36) * rim;
@@ -1308,6 +1366,153 @@
     );
     atmosphere.position.copy(planet.position);
     scene.add(atmosphere);
+
+    // ============================================================
+    // CIVILIZAÇÃO PLANETÁRIA: COMÉRCIO, POLÍTICA E CULTURA
+    // ============================================================
+
+    const civilizationOrbit = new THREE.Group();
+    planet.add(civilizationOrbit);
+
+    const tradeRingA = mesh(ringGeo, cyan, civilizationOrbit, [0, 0, 0], [630, 630, 630]);
+    tradeRingA.rotation.x = Math.PI / 2.45;
+    const tradeRingB = mesh(ringGeo, purple, civilizationOrbit, [0, 0, 0], [675, 675, 675]);
+    tradeRingB.rotation.set(Math.PI / 2.9, .55, .2);
+
+    const tradeShips = [];
+    for (let i = 0; i < 12; i++) {
+      const ship = new THREE.Group();
+      mesh(boxGeo, metal, ship, [0, 0, 0], [5, 2, 13]);
+      mesh(boxGeo, cyan, ship, [0, 1.7, -1], [2.2, .35, 7]);
+      mesh(ballGeo, purple, ship, [0, 0, 8], [1.2, 1.2, 2]);
+      ship.visible = false;
+      civilizationOrbit.add(ship);
+      tradeShips.push({ ship, phase: i / 12 * Math.PI * 2, radius: 625 + (i % 3) * 28 });
+    }
+
+    const civilization = {
+      name: "AURORA",
+      era: "COLÔNIA EMERGENTE",
+      population: 1.2,
+      economy: 18,
+      trade: 8,
+      culture: 16,
+      technology: 12,
+      stability: 72,
+      government: "CONSELHO PLANETÁRIO",
+      eventTimer: 10
+    };
+
+    const civilizationEvents = [
+      {
+        text: "AURORA // NOVO ACORDO COMERCIAL INTERCONTINENTAL",
+        apply: civ => { civ.trade += 6; civ.economy += 4; }
+      },
+      {
+        text: "AURORA // ELEIÇÕES FORMAM UMA ASSEMBLEIA FEDERADA",
+        apply: civ => { civ.government = "ASSEMBLEIA FEDERADA"; civ.stability += 5; }
+      },
+      {
+        text: "AURORA // FESTIVAL DAS TRÊS LUAS EXPANDE A CULTURA",
+        apply: civ => { civ.culture += 7; civ.stability += 2; }
+      },
+      {
+        text: "AURORA // UNIVERSIDADES INAUGURAM REDE DE PESQUISA",
+        apply: civ => { civ.technology += 6; civ.culture += 2; }
+      },
+      {
+        text: "AURORA // CRISE DIPLOMÁTICA REDUZ A ESTABILIDADE",
+        apply: civ => { civ.stability -= 8; civ.trade -= 3; }
+      },
+      {
+        text: "AURORA // NOVAS CIDADES COSTEIRAS ENTRAM EM OPERAÇÃO",
+        apply: civ => { civ.population += .08; civ.economy += 3; }
+      },
+      {
+        text: "AURORA // MOVIMENTO CÍVICO APROVA REFORMA POLÍTICA",
+        apply: civ => { civ.government = "DEMOCRACIA CÍVICA"; civ.stability += 4; civ.culture += 3; }
+      },
+      {
+        text: "AURORA // PRIMEIRA ROTA MERCANTE ORBITAL INAUGURADA",
+        apply: civ => { civ.trade += 8; civ.technology += 3; civ.economy += 4; }
+      }
+    ];
+
+    function resetCivilization() {
+      Object.assign(civilization, {
+        era: "COLÔNIA EMERGENTE",
+        population: 1.2,
+        economy: 18,
+        trade: 8,
+        culture: 16,
+        technology: 12,
+        stability: 72,
+        government: "CONSELHO PLANETÁRIO",
+        eventTimer: 10
+      });
+      planet.material.uniforms.civilizationLevel.value = .16;
+    }
+
+    function updateCivilization(dt) {
+      const stabilityFactor = clamp(civilization.stability / 70, .35, 1.4);
+      civilization.population += civilization.population * .00018 * stabilityFactor * dt;
+      civilization.economy += .009 * stabilityFactor * dt;
+      civilization.trade += .007 * (civilization.economy / 35) * dt;
+      civilization.culture += .006 * stabilityFactor * dt;
+      civilization.technology += .005 * (civilization.culture / 30) * dt;
+      civilization.stability += (68 - civilization.stability) * .003 * dt;
+
+      civilization.eventTimer -= dt;
+      if (civilization.eventTimer <= 0 && eventTimer <= .2) {
+        const event = civilizationEvents[Math.floor(Math.random() * civilizationEvents.length)];
+        event.apply(civilization);
+        queueEvent(event.text, civilization.stability < 45 ? "alert" : "ally");
+        civilization.eventTimer = rand(12, 21);
+      }
+
+      for (const key of ["economy", "trade", "culture", "technology", "stability"]) {
+        civilization[key] = clamp(civilization[key], 0, 100);
+      }
+
+      const development = (
+        civilization.economy + civilization.trade + civilization.culture +
+        civilization.technology + civilization.stability
+      ) / 500;
+
+      civilization.era = development > .72 ? "CIVILIZAÇÃO INTERESTELAR" :
+        development > .5 ? "ERA PLANETÁRIA" :
+        development > .32 ? "MUNDO INDUSTRIAL" : "COLÔNIA EMERGENTE";
+
+      planet.material.uniforms.civilizationLevel.value = clamp(development, .12, 1);
+
+      const visibleShips = clamp(2 + Math.floor((civilization.trade + civilization.technology) / 15), 2, tradeShips.length);
+      tradeShips.forEach((entry, i) => {
+        entry.ship.visible = i < visibleShips;
+        if (!entry.ship.visible) return;
+        const angle = time * (.055 + i * .0015) + entry.phase;
+        const tilt = .22 + (i % 3) * .18;
+        entry.ship.position.set(
+          Math.cos(angle) * entry.radius,
+          Math.sin(angle * .73) * entry.radius * tilt,
+          Math.sin(angle) * entry.radius
+        );
+        entry.ship.lookAt(planet.position);
+      });
+
+      tradeRingA.rotation.z += dt * .018;
+      tradeRingB.rotation.y -= dt * .014;
+    }
+
+    function updateCivilizationHUD() {
+      ui.civTitle.textContent = `PLANETA ${civilization.name} // ${civilization.era}`;
+      ui.civPopulation.textContent = `${civilization.population.toFixed(2).replace(".", ",")} BI`;
+      ui.civGovernment.textContent = civilization.government;
+      ui.civEconomy.textContent = Math.round(civilization.economy);
+      ui.civTrade.textContent = Math.round(civilization.trade);
+      ui.civCulture.textContent = Math.round(civilization.culture);
+      ui.civTechnology.textContent = Math.round(civilization.technology);
+      ui.civStability.textContent = `${Math.round(civilization.stability)}%`;
+    }
 
     // ============================================================
     // ESTAÇÃO ORBITAL
@@ -1692,6 +1897,9 @@
       station.position.sub(shift);
 
       for (const drone of drones) drone.group.position.sub(shift);
+      for (const ally of allies) ally.group.position.sub(shift);
+      boss.group.position.sub(shift);
+      mothership.group.position.sub(shift);
       for (const bullet of bullets) {
         bullet.mesh.position.sub(shift);
         bullet.previous.sub(shift);
@@ -1702,6 +1910,10 @@
       }
       for (const body of celestialBodies) body.group.position.sub(shift);
       for (const bomb of bombs) bomb.mesh.position.sub(shift);
+      for (const explosion of stationExplosions) {
+        for (const shock of explosion.shocks) shock.mesh.position.sub(shift);
+        for (const fragment of explosion.debris) fragment.mesh.position.sub(shift);
+      }
 
       for (let i = 0; i < CONFIG.particles; i++) {
         if (particleLives[i] <= 0) continue;
@@ -2196,6 +2408,67 @@
     const boss = createBoss();
 
     // ============================================================
+    // NAVE-MÃE INIMIGA
+    // ============================================================
+
+    const motherArmor = new THREE.MeshStandardMaterial({
+      color: 0x32154f,
+      emissive: 0x240531,
+      emissiveIntensity: 1.1,
+      roughness: .32,
+      metalness: .86
+    });
+    const motherDiskGeo = new THREE.CylinderGeometry(4.8, 6.2, 1.6, 12);
+
+    function createMothership() {
+      const group = new THREE.Group();
+      group.scale.setScalar(4.5);
+
+      mesh(motherDiskGeo, motherArmor, group, [0, 0, 0], [1, 1, 1]);
+      mesh(ballGeo, darkMetal, group, [0, 1.25, 0], [3.2, 1.3, 3.2]);
+      const core = mesh(ballGeo, purple, group, [0, -1.05, 0], [1.5, .65, 1.5]);
+
+      const commandRing = mesh(ringGeo, pink, group, [0, .35, 0], [6.5, 6.5, 6.5]);
+      commandRing.rotation.x = Math.PI / 2;
+
+      const turrets = [];
+      for (let i = 0; i < 8; i++) {
+        const angle = i / 8 * Math.PI * 2;
+        const turret = new THREE.Group();
+        turret.position.set(Math.cos(angle) * 5.2, .15, Math.sin(angle) * 5.2);
+        turret.rotation.y = -angle + Math.PI / 2;
+        group.add(turret);
+        mesh(boxGeo, darkMetal, turret, [0, 0, 0], [1.15, 1, 2.6]);
+        mesh(ballGeo, pink, turret, [0, 0, -1.55], [.42, .42, .3]);
+        turrets.push(turret);
+      }
+
+      for (let i = 0; i < 4; i++) {
+        const angle = i / 4 * Math.PI * 2 + Math.PI / 4;
+        const hangar = mesh(boxGeo, armor, group,
+          [Math.cos(angle) * 4.1, -.65, Math.sin(angle) * 4.1],
+          [2.3, .7, 1.5]
+        );
+        hangar.rotation.y = -angle;
+      }
+
+      group.visible = false;
+      scene.add(group);
+      return {
+        group, core, commandRing, turrets,
+        visible: false,
+        hp: CONFIG.mothershipHp,
+        cooldown: 1,
+        barrageCooldown: 4.5,
+        respawn: rand(68, 88),
+        salvo: 0,
+        phase: rand(0, Math.PI * 2)
+      };
+    }
+
+    const mothership = createMothership();
+
+    // ============================================================
     // ESTADO E PROJÉTEIS
     // ============================================================
 
@@ -2291,7 +2564,9 @@
         drone.group.visible && drone.group.position.distanceToSquared(camera.position) < 260 * 260
       ).length;
 
-      const contextual = boss.visible
+      const contextual = mothership.visible
+        ? `ALERTA // NAVE-MÃE COM ${Math.ceil(mothership.hp / CONFIG.mothershipHp * 100)}% DE INTEGRIDADE`
+        : boss.visible
         ? `ALERTA // CHEFÃO COM ${Math.ceil(boss.hp / CONFIG.bossHp * 100)}% DE INTEGRIDADE`
         : nearbyEnemies >= 5
           ? `SENSORES // FORMAÇÃO HOSTIL COM ${nearbyEnemies} CONTATOS PRÓXIMOS`
@@ -2299,7 +2574,7 @@
             ? "COMANDO // ESQUADRÃO ALIADO MANTÉM COBERTURA"
             : ambientMessages[Math.floor(Math.random() * ambientMessages.length)];
 
-      queueEvent(contextual, boss.visible || nearbyEnemies >= 5 ? "alert" : "");
+      queueEvent(contextual, mothership.visible || boss.visible || nearbyEnemies >= 5 ? "alert" : "");
     }
 
     const bullets = [];
@@ -2314,7 +2589,10 @@
       bullets.splice(index, 1);
     }
 
-    function spawnBullet(position, direction, enemy = false, owner = "player", damageValue = 9) {
+    function spawnBullet(
+      position, direction, enemy = false, owner = "player", damageValue = 9,
+      speedOverride = null
+    ) {
       const bullet = bulletPool.pop() || {
         mesh: new THREE.Mesh(bulletGeo, cyan),
         velocity: new V3(),
@@ -2332,12 +2610,14 @@
       bullet.damage = damageValue;
       bullet.life = enemy ? 4 : 2.2;
       bullet.mesh.material = enemy
-        ? pink
+        ? owner === "mothership" ? purple : pink
         : owner === "ally" ? allyShotMaterial : playerShotMaterial;
       bullet.mesh.visible = true;
       bullet.mesh.position.copy(position);
       bullet.mesh.quaternion.setFromUnitVectors(new V3(0, 0, 1), direction);
-      bullet.velocity.copy(direction).multiplyScalar(enemy ? 110 : 390);
+      bullet.velocity.copy(direction).multiplyScalar(
+        speedOverride ?? (enemy ? 110 : 390)
+      );
 
       if (!enemy && owner === "player") bullet.velocity.add(velocity);
       bullets.push(bullet);
@@ -2353,6 +2633,10 @@
 
     function isExtremeDanger() {
       if (shield <= 45) return true;
+      if (
+        mothership.visible &&
+        mothership.group.position.distanceToSquared(camera.position) < 520 * 520
+      ) return true;
       if (boss.visible && boss.group.position.distanceToSquared(camera.position) < 360 * 360) {
         return true;
       }
@@ -2430,6 +2714,14 @@
         if (boss.hp <= 0) destroyBoss();
       }
 
+      if (mothership.visible && mothership.group.position.distanceToSquared(center) <= radiusSq) {
+        mothership.hp -= 55;
+        burst(mothership.group.position, 0xff4f8c, 170, 72);
+        burst(mothership.group.position, 0xa84dff, 130, 58);
+        queueEvent("BOMBA // IMPACTO CRÍTICO NA NAVE-MÃE · -55", "alert");
+        if (mothership.hp <= 0) destroyMothership();
+      }
+
       for (const stationEntry of [...refuelStations]) {
         if (
           !stationEntry.destroyed && stationEntry.group.visible &&
@@ -2470,6 +2762,13 @@
             impact = true;
             break;
           }
+        }
+
+        if (!impact && boss.visible) {
+          impact = boss.group.position.distanceToSquared(bomb.mesh.position) < 24 * 24;
+        }
+        if (!impact && mothership.visible) {
+          impact = mothership.group.position.distanceToSquared(bomb.mesh.position) < 48 * 48;
         }
 
         if (impact || bomb.life <= 0) detonateBomb(i);
@@ -2592,6 +2891,16 @@
 
               break;
             }
+          }
+
+          if (!hit && mothership.visible && segmentDistanceSquared(
+            mothership.group.position, bullet.previous, bullet.mesh.position
+          ) < 40 * 40) {
+            mothership.hp--;
+            hitTimer = .13;
+            hit = true;
+            burst(bullet.mesh.position, 0xc65cff, 18, 18);
+            if (mothership.hp <= 0) destroyMothership();
           }
 
           if (!hit && boss.visible && segmentDistanceSquared(
@@ -3321,6 +3630,11 @@
       boss.group.visible = false;
       boss.hp = CONFIG.bossHp;
       boss.respawn = rand(34, 48);
+      mothership.visible = false;
+      mothership.group.visible = false;
+      mothership.hp = CONFIG.mothershipHp;
+      mothership.respawn = rand(65, 82);
+      resetCivilization();
       eventTimer = 4;
       nextAmbientMessage = rand(5, 8);
       queueEvent("COMANDO // CANAL TÁTICO CONECTADO");
@@ -3393,7 +3707,15 @@
     });
 
     renderer.domElement.addEventListener("mousedown", event => {
-      if (event.button !== 0 || !active) return;
+      if (!active) return;
+
+      if (event.button === 2) {
+        event.preventDefault();
+        launchBomb();
+        return;
+      }
+
+      if (event.button !== 0) return;
       mouseDown = true;
 
       if (document.pointerLockElement !== renderer.domElement) requestMouse();
@@ -3749,8 +4071,9 @@
         if (!ally.active) continue;
 
         const droneTarget = getClosestDrone(ally.group.position);
-        let targetPosition = boss.visible
-          ? boss.group.position
+        let targetPosition = mothership.visible
+          ? mothership.group.position
+          : boss.visible ? boss.group.position
           : droneTarget?.group.position;
 
         if (ally.group.position.distanceToSquared(camera.position) > 700 * 700) {
@@ -3852,6 +4175,104 @@
       }
     }
 
+    function spawnMothership() {
+      const local = new V3(rand(-130, 130), rand(80, 150), -rand(620, 760))
+        .applyQuaternion(camera.quaternion)
+        .add(camera.position);
+      mothership.group.position.copy(local);
+      mothership.group.visible = true;
+      mothership.visible = true;
+      mothership.hp = CONFIG.mothershipHp;
+      mothership.cooldown = 1.8;
+      mothership.barrageCooldown = 4.2;
+      mothership.salvo = 0;
+      queueEvent("ALERTA VERMELHO // NAVE-MÃE INIMIGA EM APROXIMAÇÃO", "alert");
+    }
+
+    function destroyMothership() {
+      if (!mothership.visible) return;
+      burst(mothership.group.position, 0xff315f, 360, 145);
+      burst(mothership.group.position, 0xb847ff, 320, 120);
+      burst(mothership.group.position, 0x55ddff, 240, 90);
+      mothership.visible = false;
+      mothership.group.visible = false;
+      mothership.respawn = rand(120, 165);
+      score += 8000;
+      queueEvent("COMANDO // NAVE-MÃE DESTRUÍDA · +8000 PTS", "ally");
+    }
+
+    function updateMothership(dt) {
+      if (!mothership.visible) {
+        mothership.respawn -= dt;
+        if (mothership.respawn <= 0) spawnMothership();
+        return;
+      }
+
+      temp.subVectors(camera.position, mothership.group.position);
+      let distance = temp.length();
+
+      if (distance > 1550 && warpTimer <= 0) {
+        const intercept = new V3(0, 120, -720)
+          .applyQuaternion(camera.quaternion)
+          .add(camera.position);
+        mothership.group.position.copy(intercept);
+        distance = 720;
+        queueEvent("ALERTA // NAVE-MÃE INTERCEPTOU A ROTA DE FUGA", "alert");
+      }
+
+      temp.normalize();
+      const approach = distance > 460 ? 24 : distance < 330 ? -13 : 0;
+      mothership.group.position.addScaledVector(temp, approach * dt);
+      mothership.group.position.x += Math.sin(time * .22 + mothership.phase) * dt * 11;
+      mothership.group.position.y += Math.cos(time * .28 + mothership.phase) * dt * 6;
+      mothership.group.lookAt(camera.position);
+      mothership.commandRing.rotation.z += dt * .55;
+      const pulse = 1.5 + Math.sin(time * 3.5) * .14;
+      mothership.core.scale.set(pulse, .65, pulse);
+
+      mothership.cooldown -= dt;
+      mothership.barrageCooldown -= dt;
+
+      if (mothership.cooldown <= 0 && distance < 850 && warpTimer === 0) {
+        const target = chooseEnemyTarget(mothership.group.position);
+        mothership.group.updateMatrixWorld(true);
+
+        for (let i = 0; i < 4; i++) {
+          const turretIndex = (mothership.salvo * 2 + i * 2) % mothership.turrets.length;
+          const origin = mothership.turrets[turretIndex].getWorldPosition(new V3());
+          const aim = target.position.clone()
+            .addScaledVector(target.velocity, Math.min(distance / 210, 1) * .7)
+            .add(new V3(rand(-14, 14), rand(-10, 10), rand(-8, 8)));
+          spawnBullet(origin, aim.sub(origin).normalize(), true, "mothership", 8, 138);
+        }
+
+        mothership.salvo++;
+        mothership.cooldown = rand(.72, 1.05);
+      }
+
+      if (mothership.barrageCooldown <= 0 && distance < 760 && warpTimer === 0) {
+        const target = chooseEnemyTarget(mothership.group.position);
+        const origin = mothership.group.position.clone();
+        const base = new V3().subVectors(target.position, origin).normalize();
+        const right = new V3().crossVectors(base, new V3(0, 1, 0));
+        if (right.lengthSq() < .01) right.set(1, 0, 0);
+        right.normalize();
+        const up = new V3().crossVectors(right, base).normalize();
+
+        for (let i = 0; i < 12; i++) {
+          const angle = i / 12 * Math.PI * 2;
+          const direction = base.clone()
+            .addScaledVector(right, Math.cos(angle) * .2)
+            .addScaledVector(up, Math.sin(angle) * .2)
+            .normalize();
+          spawnBullet(origin, direction, true, "mothership", 7, 102);
+        }
+
+        queueEvent("ALERTA // NAVE-MÃE DISPAROU UMA SALVA DE SATURAÇÃO", "alert");
+        mothership.barrageCooldown = rand(5.2, 7.1);
+      }
+    }
+
     // ============================================================
     // RADAR E HUD
     // ============================================================
@@ -3877,6 +4298,7 @@
       ui.warpValue.textContent = `${Math.floor(charge)}%`;
       ui.fuelValue.textContent = `${Math.ceil(fuel)}%`;
       ui.bombValue.textContent = `${bombCount}/${CONFIG.maxBombs}`;
+      updateCivilizationHUD();
 
       ui.reticle.classList.toggle("hit", hitTimer > 0);
 
@@ -3957,6 +4379,35 @@
               y: (-projected.y * .5 + .5) * innerHeight,
               distance: camera.position.distanceTo(drone.group.position),
               label: "SENTINELA"
+            };
+          }
+        }
+      }
+
+      if (mothership.visible) {
+        radarVector.subVectors(mothership.group.position, camera.position)
+          .applyQuaternion(inverseQuaternion);
+        let mx = radarVector.x * .42;
+        let my = radarVector.z * .42;
+        const ml = Math.hypot(mx, my);
+        if (ml > 104) { mx *= 104 / ml; my *= 104 / ml; }
+        radar.fillStyle = "#ff2f88";
+        radar.beginPath();
+        radar.arc(120 + mx, 120 + my, 9, 0, Math.PI * 2);
+        radar.fill();
+        radar.strokeStyle = "#d78aff";
+        radar.strokeRect(112 + mx, 112 + my, 16, 16);
+
+        if (radarVector.z < 0) {
+          projected.copy(mothership.group.position).project(camera);
+          const screenDistance = projected.x * projected.x + projected.y * projected.y;
+          if (projected.z < 1 && screenDistance < bestScreenDistance) {
+            bestScreenDistance = screenDistance;
+            bestTarget = {
+              x: (projected.x * .5 + .5) * innerWidth,
+              y: (-projected.y * .5 + .5) * innerHeight,
+              distance: camera.position.distanceTo(mothership.group.position),
+              label: `NAVE-MÃE ${Math.ceil(mothership.hp / CONFIG.mothershipHp * 100)}%`
             };
           }
         }
@@ -4119,11 +4570,13 @@
         updateDrones(dt);
         updateAllies(dt);
         updateBoss(dt);
+        updateMothership(dt);
         updateBullets(dt);
         updateBombs(dt);
         updateParticles(dt);
         updateStationExplosions(dt);
         updateEnvironment(dt);
+        updateCivilization(dt);
         updateMissionEvents(dt);
       } else if (!started) {
         // Cena de apresentação animada sem iniciar o combate.
