@@ -1418,7 +1418,18 @@
     let bombRefillTimer = 0;
 
     // A estação original continua sendo um porto de abastecimento no sistema inicial.
-    refuelStations.push({ group: station, radius: 34, starter: true, sectorKey: null });
+    const starterStation = {
+      group: station,
+      radius: 34,
+      starter: true,
+      sectorKey: null,
+      id: "S:START",
+      maxHp: 90,
+      hp: 90,
+      destroyed: false,
+      lastWarning: 100
+    };
+    refuelStations.push(starterStation);
 
     function hash32(x, y, z, salt = 0) {
       let h = (x * 374761393 + y * 668265263 + z * 2147483647 + salt * 1274126177) | 0;
@@ -1446,6 +1457,9 @@
     }
 
     function createRefuelStation(position, sectorKey, index = 0) {
+      const id = `S:${sectorKey}:${index}`;
+      if (destroyedWorldObjects.has(id)) return null;
+
       const group = new THREE.Group();
       group.position.copy(position);
 
@@ -1468,7 +1482,18 @@
       }
 
       scene.add(group);
-      const entry = { group, radius: 32, sectorKey, starter: false, index };
+      const entry = {
+        group,
+        radius: 32,
+        sectorKey,
+        starter: false,
+        index,
+        id,
+        maxHp: 70,
+        hp: 70,
+        destroyed: false,
+        lastWarning: 100
+      };
       refuelStations.push(entry);
       return entry;
     }
@@ -1567,7 +1592,7 @@
         const stationEntry = createRefuelStation(
           localFromGalactic(randomGalacticPosition(220)), key, 0
         );
-        record.stations.push(stationEntry);
+        if (stationEntry) record.stations.push(stationEntry);
       }
 
       // Corpos celestes de baixa geometria; grandes o bastante para serem marcos visuais.
@@ -1897,6 +1922,128 @@
     }
 
     // ============================================================
+    // DESTRUIÇÃO DAS ESTAÇÕES
+    // ============================================================
+
+    const stationExplosions = [];
+    const stationShockGeo = new THREE.SphereGeometry(1, 20, 14);
+
+    function damageStation(entry, amount, impactPosition) {
+      if (!entry || entry.destroyed || !entry.group.visible) return false;
+      entry.hp = Math.max(0, entry.hp - amount);
+      burst(impactPosition || entry.group.position, 0x8ff7ff, 18, 18);
+
+      const integrity = Math.ceil(entry.hp / entry.maxHp * 100);
+      const warningStep = Math.floor(integrity / 20) * 20;
+      if (warningStep < entry.lastWarning && integrity > 0) {
+        entry.lastWarning = warningStep;
+        queueEvent(`ESTAÇÃO // INTEGRIDADE ESTRUTURAL EM ${integrity}%`, "alert");
+      }
+
+      if (entry.hp <= 0) destroyStation(entry);
+      return true;
+    }
+
+    function destroyStation(entry) {
+      if (!entry || entry.destroyed) return;
+      entry.destroyed = true;
+      const center = entry.group.position.clone();
+
+      burst(center, 0xff542f, 250, 125);
+      burst(center, 0xffc34d, 210, 92);
+      burst(center, 0x43dcff, 180, 72);
+
+      const shocks = [
+        { color: 0xff7042, speed: 105, opacity: .72 },
+        { color: 0x50dfff, speed: 76, opacity: .58 },
+        { color: 0xc068ff, speed: 52, opacity: .42 }
+      ].map(config => {
+        const material = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(config.color).multiplyScalar(3.2),
+          transparent: true,
+          opacity: config.opacity,
+          wireframe: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const shock = new THREE.Mesh(stationShockGeo, material);
+        shock.position.copy(center);
+        shock.scale.setScalar(2);
+        scene.add(shock);
+        return { mesh: shock, speed: config.speed, opacity: config.opacity };
+      });
+
+      const debris = [];
+      for (let i = 0; i < 24; i++) {
+        const fragment = new THREE.Mesh(boxGeo, i % 3 ? metal : darkMetal);
+        fragment.position.copy(center).add(new V3().randomDirection().multiplyScalar(rand(3, 22)));
+        fragment.scale.set(rand(.6, 2.8), rand(.25, 1.3), rand(1.2, 5));
+        scene.add(fragment);
+        debris.push({
+          mesh: fragment,
+          velocity: new V3().randomDirection().multiplyScalar(rand(28, 105)),
+          spin: new V3(rand(-5, 5), rand(-5, 5), rand(-5, 5))
+        });
+      }
+
+      stationExplosions.push({ shocks, debris, life: 2.8, maxLife: 2.8 });
+
+      if (entry.starter) {
+        entry.group.visible = false;
+      } else {
+        destroyedWorldObjects.add(entry.id);
+        scene.remove(entry.group);
+        removeArrayEntry(refuelStations, entry);
+      }
+
+      if (center.distanceToSquared(camera.position) < 210 * 210) {
+        const distance = center.distanceTo(camera.position);
+        shield = Math.max(0, shield - Math.max(8, 42 * (1 - distance / 210)));
+        sinceDamage = 0;
+        damage = 1;
+        if (shield <= 0) {
+          dead = true;
+          pause();
+        }
+      }
+
+      queueEvent("ALERTA // ESTAÇÃO DESTRUÍDA · REAÇÃO EM CADEIA", "alert");
+    }
+
+    function updateStationExplosions(dt) {
+      for (let i = stationExplosions.length - 1; i >= 0; i--) {
+        const explosion = stationExplosions[i];
+        explosion.life -= dt;
+        const elapsed = explosion.maxLife - explosion.life;
+        const fade = clamp(explosion.life / explosion.maxLife, 0, 1);
+
+        for (const shock of explosion.shocks) {
+          shock.mesh.scale.setScalar(2 + elapsed * shock.speed);
+          shock.mesh.material.opacity = shock.opacity * fade * fade;
+          shock.mesh.rotation.y += dt * .8;
+        }
+
+        for (const fragment of explosion.debris) {
+          fragment.mesh.position.addScaledVector(fragment.velocity, dt);
+          fragment.velocity.multiplyScalar(Math.exp(-.7 * dt));
+          fragment.mesh.rotation.x += fragment.spin.x * dt;
+          fragment.mesh.rotation.y += fragment.spin.y * dt;
+          fragment.mesh.rotation.z += fragment.spin.z * dt;
+          fragment.mesh.scale.multiplyScalar(Math.exp(-.35 * dt));
+        }
+
+        if (explosion.life <= 0) {
+          for (const shock of explosion.shocks) {
+            scene.remove(shock.mesh);
+            shock.mesh.material.dispose();
+          }
+          for (const fragment of explosion.debris) scene.remove(fragment.mesh);
+          stationExplosions.splice(i, 1);
+        }
+      }
+    }
+
+    // ============================================================
     // DRONES ROBÓTICOS
     // ============================================================
 
@@ -1960,7 +2107,11 @@
     // ============================================================
 
     const allyGreen = new THREE.MeshStandardMaterial({
-      color: 0x3bd99a, roughness: .35, metalness: .72
+      color: 0x56ffc0,
+      emissive: 0x0d6b4a,
+      emissiveIntensity: 1.7,
+      roughness: .28,
+      metalness: .62
     });
     const bossArmor = new THREE.MeshStandardMaterial({
       color: 0x5a263b, roughness: .4, metalness: .82
@@ -1968,6 +2119,7 @@
 
     function createAlly(index) {
       const group = new THREE.Group();
+      group.scale.setScalar(1.55);
       mesh(boxGeo, armor, group, [0, 0, 0], [1.1, .38, 2.7]);
       mesh(ballGeo, darkMetal, group, [0, .25, -.2], [.72, .35, 1.1]);
       mesh(boxGeo, allyGreen, group, [0, .43, -.4], [.32, .035, 1.2]);
@@ -1979,6 +2131,13 @@
         mesh(ballGeo, allyGreen, group, [side * .58, -.15, 2.5], [.16, .16, .3]);
       }
 
+      const marker = mesh(ringGeo, allyGreen, group, [0, 0, .2], [2.6, 2.6, 2.6]);
+      marker.rotation.x = Math.PI / 2;
+
+      const beacon = new THREE.PointLight(0x55ffb8, 5, 34);
+      beacon.position.set(0, .5, 1.2);
+      group.add(beacon);
+
       group.visible = false;
       scene.add(group);
       return {
@@ -1986,7 +2145,9 @@
         index,
         active: false,
         cooldown: rand(.25, .8),
-        life: 0,
+        hp: 28,
+        maxHp: 28,
+        respawn: 0,
         phase: rand(0, Math.PI * 2),
         velocity: new V3()
       };
@@ -1997,18 +2158,28 @@
 
     function createBoss() {
       const group = new THREE.Group();
-      mesh(boxGeo, bossArmor, group, [0, 0, 0], [15, 4.8, 11]);
-      mesh(ballGeo, darkMetal, group, [0, 3.4, -1], [7.2, 3.1, 6]);
-      const core = mesh(ballGeo, pink, group, [0, .2, -10.5], [2.7, 2.7, 1.4]);
+      group.scale.setScalar(3);
+
+      const bossHullGeo = new THREE.OctahedronGeometry(1, 0);
+      const bossWingGeo = new THREE.TetrahedronGeometry(1, 0);
+      const hull = mesh(bossHullGeo, bossArmor, group, [0, 0, 0], [2.8, 1.45, 4.2]);
+      hull.rotation.x = Math.PI / 4;
+      mesh(ballGeo, darkMetal, group, [0, 1.15, .35], [1.65, .85, 2.15]);
+      const core = mesh(ballGeo, pink, group, [0, .05, -4.15], [.9, .9, .5]);
 
       const turrets = [];
       for (const side of [-1, 1]) {
-        mesh(boxGeo, bossArmor, group, [side * 12.5, -.7, 1], [11, 1.1, 4.2]);
-        const turret = mesh(boxGeo, darkMetal, group, [side * 10.5, 1.2, -5.5], [2.2, 2.2, 6.5]);
-        mesh(ballGeo, pink, turret, [0, 0, -3.45], [.75, .75, .35]);
+        const wing = mesh(bossWingGeo, bossArmor, group, [side * 3.2, -.2, .45], [3.5, 1.0, 3.1]);
+        wing.rotation.set(.25, side * .42, side * -.18);
+        const turret = mesh(boxGeo, darkMetal, group, [side * 2.6, .65, -2.5], [.75, .75, 3.2]);
+        mesh(ballGeo, pink, turret, [0, 0, -1.75], [.3, .3, .18]);
         turrets.push(turret);
-        mesh(ringGeo, purple, group, [side * 6.2, 0, 7.2], [2.1, 2.1, 2.1]);
+        const engineRing = mesh(ringGeo, purple, group, [side * 1.45, -.1, 3.5], [.85, .85, .85]);
+        engineRing.rotation.x = Math.PI / 2;
       }
+
+      const crown = mesh(ringGeo, purple, group, [0, 1.7, .4], [2.3, 2.3, 2.3]);
+      crown.rotation.x = Math.PI / 2;
 
       group.visible = false;
       scene.add(group);
@@ -2259,6 +2430,15 @@
         if (boss.hp <= 0) destroyBoss();
       }
 
+      for (const stationEntry of [...refuelStations]) {
+        if (
+          !stationEntry.destroyed && stationEntry.group.visible &&
+          stationEntry.group.position.distanceToSquared(center) <= radiusSq
+        ) {
+          damageStation(stationEntry, 24, stationEntry.group.position);
+        }
+      }
+
       for (let i = bullets.length - 1; i >= 0; i--) {
         if (bullets[i].enemy && bullets[i].mesh.position.distanceToSquared(center) <= radiusSq) {
           removeBullet(i);
@@ -2350,12 +2530,34 @@
         let hit = false;
 
         if (bullet.enemy) {
-          if (
-            warpTimer <= 0 &&
-            segmentDistanceSquared(
-              camera.position, bullet.previous, bullet.mesh.position
-            ) < 9
-          ) {
+          for (const ally of allies) {
+            if (!ally.active) continue;
+            if (segmentDistanceSquared(
+              ally.group.position, bullet.previous, bullet.mesh.position
+            ) < 52) {
+              ally.hp = Math.max(0, ally.hp - bullet.damage);
+              burst(bullet.mesh.position, 0x69ffc5, 22, 20);
+              hit = true;
+              if (ally.hp <= 0) destroyAlly(ally);
+              break;
+            }
+          }
+
+          if (!hit) {
+            for (const stationEntry of [...refuelStations]) {
+              if (stationEntry.destroyed || !stationEntry.group.visible) continue;
+              if (segmentDistanceSquared(
+                stationEntry.group.position, bullet.previous, bullet.mesh.position
+              ) < stationEntry.radius * stationEntry.radius) {
+                hit = damageStation(stationEntry, bullet.damage, bullet.mesh.position);
+                break;
+              }
+            }
+          }
+
+          if (!hit && warpTimer <= 0 && segmentDistanceSquared(
+            camera.position, bullet.previous, bullet.mesh.position
+          ) < 9) {
             shield = Math.max(0, shield - bullet.damage);
             sinceDamage = 0;
             damage = 1;
@@ -2401,6 +2603,18 @@
             burst(bullet.mesh.position, 0xff805f, 12, 14);
 
             if (boss.hp <= 0) destroyBoss();
+          }
+
+          if (!hit && bullet.owner === "player") {
+            for (const stationEntry of [...refuelStations]) {
+              if (stationEntry.destroyed || !stationEntry.group.visible) continue;
+              if (segmentDistanceSquared(
+                stationEntry.group.position, bullet.previous, bullet.mesh.position
+              ) < stationEntry.radius * stationEntry.radius) {
+                hit = damageStation(stationEntry, 1, bullet.mesh.position);
+                break;
+              }
+            }
           }
 
           if (!hit) {
@@ -3067,6 +3281,14 @@
         scene.remove(bombs[bombs.length - 1].mesh);
         bombs.pop();
       }
+      while (stationExplosions.length) {
+        const explosion = stationExplosions.pop();
+        for (const shock of explosion.shocks) {
+          scene.remove(shock.mesh);
+          shock.mesh.material.dispose();
+        }
+        for (const fragment of explosion.debris) scene.remove(fragment.mesh);
+      }
 
       for (const key of Array.from(loadedSectors.keys())) unloadSector(key);
       destroyedWorldObjects.clear();
@@ -3076,6 +3298,11 @@
       planet.position.set(-1050, 270, -2300);
       atmosphere.position.copy(planet.position);
       station.position.set(0, 15, -540);
+      station.visible = true;
+      if (!station.parent) scene.add(station);
+      starterStation.destroyed = false;
+      starterStation.hp = starterStation.maxHp;
+      starterStation.lastWarning = 100;
 
       particleLives.fill(0);
       particleColors.fill(0);
@@ -3086,6 +3313,8 @@
       allies.forEach(ally => {
         ally.active = false;
         ally.group.visible = false;
+        ally.hp = ally.maxHp;
+        ally.respawn = 0;
       });
       allySpawnTimer = rand(20, 32);
       boss.visible = false;
@@ -3362,7 +3591,7 @@
       }
 
       for (const stationEntry of refuelStations) {
-        if (!stationEntry.group.parent) continue;
+        if (stationEntry.destroyed || !stationEntry.group.parent || !stationEntry.group.visible) continue;
         if (!stationEntry.starter) stationEntry.group.rotation.y += dt * .18;
 
         const range = stationEntry.radius + 18;
@@ -3386,6 +3615,25 @@
       for (const body of celestialBodies) {
         body.group.rotation.y += body.spin * dt;
       }
+    }
+
+    function chooseEnemyTarget(origin) {
+      const availableAllies = allies.filter(ally => ally.active);
+      if (availableAllies.length && Math.random() < .48) {
+        const ally = availableAllies[Math.floor(Math.random() * availableAllies.length)];
+        return { position: ally.group.position, velocity: ally.velocity, type: "ally" };
+      }
+
+      const nearbyStations = refuelStations.filter(entry =>
+        !entry.destroyed && entry.group.visible && entry.group.parent &&
+        entry.group.position.distanceToSquared(origin) < 520 * 520
+      );
+      if (nearbyStations.length && Math.random() < .18) {
+        const target = nearbyStations[Math.floor(Math.random() * nearbyStations.length)];
+        return { position: target.group.position, velocity: new V3(), type: "station" };
+      }
+
+      return { position: camera.position, velocity, type: "player" };
     }
 
     function updateDrones(dt) {
@@ -3424,9 +3672,12 @@
         drone.cooldown -= dt;
 
         if (drone.cooldown <= 0 && distance < 330 && warpTimer === 0) {
-          const origin = p.clone().addScaledVector(temp, 4);
-          const aim = camera.position.clone()
-            .addScaledVector(velocity, Math.min(distance / 110, 1) * .55)
+          const target = chooseEnemyTarget(p);
+          drone.group.lookAt(target.position);
+          const attackDirection = new V3().subVectors(target.position, p).normalize();
+          const origin = p.clone().addScaledVector(attackDirection, 4);
+          const aim = target.position.clone()
+            .addScaledVector(target.velocity, Math.min(distance / 110, 1) * .55)
             .add(new V3(rand(-3, 3), rand(-3, 3), rand(-3, 3)));
 
           spawnBullet(origin, aim.sub(origin).normalize(), true);
@@ -3436,11 +3687,12 @@
     }
 
     function spawnAlliedSquadron() {
-      const count = Math.random() < .55 ? CONFIG.allies : CONFIG.allies - 1;
+      const ready = allies.filter(ally => !ally.active && ally.respawn <= 0);
+      if (!ready.length) return;
 
-      for (let i = 0; i < count; i++) {
-        const ally = allies[i];
-        const local = new V3((i - (count - 1) / 2) * 16, rand(5, 15), 22 + i * 7)
+      for (let i = 0; i < ready.length; i++) {
+        const ally = ready[i];
+        const local = new V3((ally.index - 1) * 22, 8 + ally.index * 5, 28 + i * 9)
           .applyQuaternion(camera.quaternion)
           .add(camera.position);
 
@@ -3448,13 +3700,23 @@
         ally.group.quaternion.copy(camera.quaternion);
         ally.group.visible = true;
         ally.active = true;
-        ally.life = rand(17, 23);
+        ally.hp = ally.maxHp;
         ally.cooldown = rand(.2, .75);
         ally.velocity.copy(velocity);
       }
 
-      queueEvent(`COMANDO // ${count} NAVES ALIADAS ENTRARAM NO SETOR`, "ally");
-      allySpawnTimer = rand(42, 68);
+      queueEvent(`COMANDO // ${ready.length} NAVES ALIADAS ENTRARAM NO SETOR`, "ally");
+      allySpawnTimer = 8;
+    }
+
+    function destroyAlly(ally) {
+      if (!ally.active) return;
+      burst(ally.group.position, 0x59ffc0, 95, 48);
+      burst(ally.group.position, 0xffa451, 70, 38);
+      ally.active = false;
+      ally.group.visible = false;
+      ally.respawn = rand(28, 42);
+      queueEvent(`COMANDO // ALIADO ${ally.index + 1} ABATIDO · REFORÇO SOLICITADO`, "alert");
     }
 
     function getClosestDrone(position) {
@@ -3475,27 +3737,25 @@
 
     function updateAllies(dt) {
       allySpawnTimer -= dt;
-      if (allySpawnTimer <= 0 && !allies.some(ally => ally.active)) {
+      for (const ally of allies) {
+        if (!ally.active) ally.respawn = Math.max(0, ally.respawn - dt);
+      }
+
+      if (allySpawnTimer <= 0 && allies.some(ally => !ally.active && ally.respawn <= 0)) {
         spawnAlliedSquadron();
       }
 
       for (const ally of allies) {
         if (!ally.active) continue;
 
-        ally.life -= dt;
-        if (ally.life <= 0) {
-          ally.active = false;
-          ally.group.visible = false;
-          if (!allies.some(candidate => candidate.active)) {
-            queueEvent("ESQUADRÃO ALIADO // SALTO DE RETORNO CONFIRMADO", "ally");
-          }
-          continue;
-        }
-
         const droneTarget = getClosestDrone(ally.group.position);
-        const targetPosition = boss.visible
+        let targetPosition = boss.visible
           ? boss.group.position
           : droneTarget?.group.position;
+
+        if (ally.group.position.distanceToSquared(camera.position) > 700 * 700) {
+          targetPosition = null;
+        }
 
         if (!targetPosition) {
           const escort = new V3(
@@ -3504,7 +3764,7 @@
             28
           ).applyQuaternion(camera.quaternion).add(camera.position);
           temp.subVectors(escort, ally.group.position);
-          ally.velocity.lerp(temp.clampLength(0, 72), 1 - Math.exp(-2.4 * dt));
+          ally.velocity.lerp(temp.clampLength(0, 230), 1 - Math.exp(-2.4 * dt));
         } else {
           temp.subVectors(targetPosition, ally.group.position);
           const distance = temp.length();
@@ -3576,14 +3836,15 @@
       boss.group.position.x += Math.sin(time * .42 + boss.phase) * dt * 13;
       boss.group.position.y += Math.cos(time * .55 + boss.phase) * dt * 8;
       boss.group.lookAt(camera.position);
-      boss.core.scale.setScalar(2.7 + Math.sin(time * 4.2) * .22);
+      boss.core.scale.set(.9 + Math.sin(time * 4.2) * .07, .9 + Math.sin(time * 4.2) * .07, .5);
 
       boss.cooldown -= dt;
       if (boss.cooldown <= 0 && distance < 620 && warpTimer === 0) {
+        const target = chooseEnemyTarget(boss.group.position);
         for (let i = -1; i <= 1; i++) {
           const origin = boss.group.position.clone();
-          const aim = camera.position.clone()
-            .addScaledVector(velocity, Math.min(distance / 170, 1) * .6)
+          const aim = target.position.clone()
+            .addScaledVector(target.velocity, Math.min(distance / 170, 1) * .6)
             .add(new V3(i * 8, rand(-5, 5), rand(-3, 3)));
           spawnBullet(origin, aim.sub(origin).normalize(), true, "boss", 14);
         }
@@ -3741,7 +4002,7 @@
       }
 
       for (const stationEntry of refuelStations) {
-        if (!stationEntry.group.parent) continue;
+        if (stationEntry.destroyed || !stationEntry.group.visible || !stationEntry.group.parent) continue;
         radarVector.subVectors(stationEntry.group.position, camera.position)
           .applyQuaternion(inverseQuaternion);
         let sx = radarVector.x * .42;
@@ -3861,6 +4122,7 @@
         updateBullets(dt);
         updateBombs(dt);
         updateParticles(dt);
+        updateStationExplosions(dt);
         updateEnvironment(dt);
         updateMissionEvents(dt);
       } else if (!started) {
