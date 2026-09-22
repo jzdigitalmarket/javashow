@@ -218,6 +218,29 @@
       color: #82afc0;
     }
 
+    #eventFeed {
+      position: absolute;
+      left: 50%;
+      bottom: 76px;
+      transform: translateX(-50%);
+      width: min(680px, 58vw);
+      min-height: 32px;
+      padding: 8px 18px;
+      border-left: 2px solid #63f7ff88;
+      border-right: 2px solid #63f7ff88;
+      background: linear-gradient(90deg, transparent, #031725cc 18%, #031725cc 82%, transparent);
+      color: #aeefff;
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.45;
+      letter-spacing: 2px;
+      text-shadow: 0 0 8px #001b2b;
+      transition: opacity .35s ease, color .2s ease;
+    }
+
+    #eventFeed.alert { color: #ff7898; border-color: #ff557a99; }
+    #eventFeed.ally { color: #72ffc4; border-color: #57f0a199; }
+
     #overlay {
       position: fixed;
       inset: 0;
@@ -293,6 +316,7 @@
       #radarBox { right: 15px; bottom: 15px; }
       #radar { width: 120px; height: 120px; }
       #hint { display: none; }
+      #eventFeed { bottom: 22px; width: 68vw; font-size: 9px; letter-spacing: 1px; }
       .panel { padding: 25px; }
     }
 
@@ -617,6 +641,15 @@
       display: none;
     }
 
+    body.touch-ui #eventFeed {
+      left: 50%;
+      bottom: calc(max(18px, env(safe-area-inset-bottom)) + var(--pad-size) + 76px);
+      width: min(62vw, 430px);
+      padding: 6px 10px;
+      font-size: 9px;
+      letter-spacing: 1px;
+    }
+
     body.touch-ui #touchHelp {
       display: block;
     }
@@ -724,6 +757,10 @@
     <div id="hint">
       WASD · ESPAÇO / CTRL · SHIFT TURBO<br>
       MOUSE / SETAS MIRAR · J ATIRAR · B BOMBA · V VISÃO · F SALTO · P PAUSA
+    </div>
+
+    <div id="eventFeed" role="status" aria-live="polite">
+      COMANDO // CANAL TÁTICO CONECTADO
     </div>
   </div>
 
@@ -933,6 +970,8 @@
       fuelDrainWarp: 2.2,
 
       drones: 9,
+      allies: 3,
+      bossHp: 42,
       cruiseSpeed: 48,
       boostSpeed: 145,
       warpSpeed: 620
@@ -946,6 +985,7 @@
     const ui = {
       overlay: $("overlay"), title: $("title"), description: $("description"),
       start: $("start"), status: $("status"), message: $("message"),
+      eventFeed: $("eventFeed"),
       score: $("score"), speed: $("speed"), sector: $("sector"),
       shield: $("shieldBar"), heat: $("heatBar"), warp: $("warpBar"),
       fuel: $("fuelBar"), bomb: $("bombBar"),
@@ -1052,6 +1092,20 @@
 
     const armor = new THREE.MeshStandardMaterial({
       color: 0x70879c, roughness: .38, metalness: .72
+    });
+
+    // Material sem emissão para os canhões: mantém a leitura da peça sem halo.
+    const weaponAccent = new THREE.MeshStandardMaterial({
+      color: 0x35a9ba, roughness: .48, metalness: .62
+    });
+
+    // Disparos abaixo do limiar do bloom, sem multiplicação de intensidade.
+    const playerShotMaterial = new THREE.MeshBasicMaterial({
+      color: 0x8de8ef, toneMapped: false
+    });
+
+    const allyShotMaterial = new THREE.MeshBasicMaterial({
+      color: 0x63f0a8, toneMapped: false
     });
 
     const glow = hex => new THREE.MeshBasicMaterial({
@@ -1647,7 +1701,7 @@
         [side * .95, -.67, -1.6], [.28, .25, 1.35]
       );
 
-      mesh(boxGeo, cyan, gun, [0, .56, -.05], [.45, .07, .7]);
+      mesh(boxGeo, weaponAccent, gun, [0, .56, -.05], [.45, .07, .7]);
 
       const support = mesh(
         boxGeo, metal, cockpit,
@@ -1655,7 +1709,7 @@
       );
       support.rotation.z = -side * .35;
 
-      mesh(boxGeo, cyan, cockpit,
+      mesh(boxGeo, weaponAccent, cockpit,
         [side * 1.05, -.91, -1.9], [.5, .018, .05]);
     }
 
@@ -1902,6 +1956,75 @@
     for (let i = 0; i < CONFIG.drones; i++) drones.push(createDrone());
 
     // ============================================================
+    // ESQUADRÃO ALIADO E NAVE-CHEFÃ
+    // ============================================================
+
+    const allyGreen = new THREE.MeshStandardMaterial({
+      color: 0x3bd99a, roughness: .35, metalness: .72
+    });
+    const bossArmor = new THREE.MeshStandardMaterial({
+      color: 0x5a263b, roughness: .4, metalness: .82
+    });
+
+    function createAlly(index) {
+      const group = new THREE.Group();
+      mesh(boxGeo, armor, group, [0, 0, 0], [1.1, .38, 2.7]);
+      mesh(ballGeo, darkMetal, group, [0, .25, -.2], [.72, .35, 1.1]);
+      mesh(boxGeo, allyGreen, group, [0, .43, -.4], [.32, .035, 1.2]);
+
+      for (const side of [-1, 1]) {
+        const wing = mesh(boxGeo, metal, group, [side * 1.35, -.12, .15], [1.5, .09, 1.15]);
+        wing.rotation.z = side * -.14;
+        mesh(boxGeo, darkMetal, group, [side * 1.12, -.08, -1.45], [.22, .2, 1.45]);
+        mesh(ballGeo, allyGreen, group, [side * .58, -.15, 2.5], [.16, .16, .3]);
+      }
+
+      group.visible = false;
+      scene.add(group);
+      return {
+        group,
+        index,
+        active: false,
+        cooldown: rand(.25, .8),
+        life: 0,
+        phase: rand(0, Math.PI * 2),
+        velocity: new V3()
+      };
+    }
+
+    const allies = Array.from({ length: CONFIG.allies }, (_, i) => createAlly(i));
+    let allySpawnTimer = rand(24, 38);
+
+    function createBoss() {
+      const group = new THREE.Group();
+      mesh(boxGeo, bossArmor, group, [0, 0, 0], [15, 4.8, 11]);
+      mesh(ballGeo, darkMetal, group, [0, 3.4, -1], [7.2, 3.1, 6]);
+      const core = mesh(ballGeo, pink, group, [0, .2, -10.5], [2.7, 2.7, 1.4]);
+
+      const turrets = [];
+      for (const side of [-1, 1]) {
+        mesh(boxGeo, bossArmor, group, [side * 12.5, -.7, 1], [11, 1.1, 4.2]);
+        const turret = mesh(boxGeo, darkMetal, group, [side * 10.5, 1.2, -5.5], [2.2, 2.2, 6.5]);
+        mesh(ballGeo, pink, turret, [0, 0, -3.45], [.75, .75, .35]);
+        turrets.push(turret);
+        mesh(ringGeo, purple, group, [side * 6.2, 0, 7.2], [2.1, 2.1, 2.1]);
+      }
+
+      group.visible = false;
+      scene.add(group);
+      return {
+        group, core, turrets,
+        visible: false,
+        hp: CONFIG.bossHp,
+        cooldown: 1.5,
+        respawn: rand(38, 52),
+        phase: rand(0, Math.PI * 2)
+      };
+    }
+
+    const boss = createBoss();
+
+    // ============================================================
     // ESTADO E PROJÉTEIS
     // ============================================================
 
@@ -1965,6 +2088,48 @@
     let fuel = 100, bombCount = CONFIG.maxBombs, bombCooldown = 0;
     let warpTimer = 0, warpVisual = 0, damage = 0, hitTimer = 0;
     let fireCooldown = 0, sinceDamage = 10, overheated = false;
+    let eventTimer = 4, nextAmbientMessage = rand(5, 8);
+
+    const ambientMessages = [
+      "SENSORES // DESTROÇOS METÁLICOS À DERIVA",
+      "COMANDO // PATRULHA INIMIGA DETECTADA NO SETOR",
+      "NAVEGAÇÃO // CORREDOR DE SALTO PARCIALMENTE ESTÁVEL",
+      "ANÁLISE // ASSINATURAS DE PLASMA EM MOVIMENTO",
+      "SISTEMAS // TELEMETRIA DE COMBATE SINCRONIZADA",
+      "COMANDO // MANTENHA DISTÂNCIA DOS CAMPOS DE ASTEROIDES",
+      "SENSORES // VARREDURA DE LONGO ALCANCE CONCLUÍDA",
+      "NAVEGAÇÃO // ROTA ALTERNATIVA CALCULADA"
+    ];
+
+    function queueEvent(text, type = "") {
+      ui.eventFeed.textContent = text;
+      ui.eventFeed.className = type;
+      ui.eventFeed.style.opacity = "1";
+      eventTimer = 4.2;
+      nextAmbientMessage = rand(6, 10);
+    }
+
+    function updateMissionEvents(dt) {
+      eventTimer = Math.max(0, eventTimer - dt);
+      nextAmbientMessage -= dt;
+      ui.eventFeed.style.opacity = eventTimer > 0 ? "1" : ".48";
+
+      if (nextAmbientMessage > 0 || eventTimer > 0) return;
+
+      const nearbyEnemies = drones.filter(drone =>
+        drone.group.visible && drone.group.position.distanceToSquared(camera.position) < 260 * 260
+      ).length;
+
+      const contextual = boss.visible
+        ? `ALERTA // CHEFÃO COM ${Math.ceil(boss.hp / CONFIG.bossHp * 100)}% DE INTEGRIDADE`
+        : nearbyEnemies >= 5
+          ? `SENSORES // FORMAÇÃO HOSTIL COM ${nearbyEnemies} CONTATOS PRÓXIMOS`
+          : allies.some(ally => ally.active)
+            ? "COMANDO // ESQUADRÃO ALIADO MANTÉM COBERTURA"
+            : ambientMessages[Math.floor(Math.random() * ambientMessages.length)];
+
+      queueEvent(contextual, boss.visible || nearbyEnemies >= 5 ? "alert" : "");
+    }
 
     const bullets = [];
     const bulletPool = [];
@@ -1978,26 +2143,32 @@
       bullets.splice(index, 1);
     }
 
-    function spawnBullet(position, direction, enemy = false) {
+    function spawnBullet(position, direction, enemy = false, owner = "player", damageValue = 9) {
       const bullet = bulletPool.pop() || {
         mesh: new THREE.Mesh(bulletGeo, cyan),
         velocity: new V3(),
         previous: new V3(),
         life: 0,
-        enemy: false
+        enemy: false,
+        owner: "player",
+        damage: 9
       };
 
       if (!bullet.mesh.parent) scene.add(bullet.mesh);
 
       bullet.enemy = enemy;
+      bullet.owner = owner;
+      bullet.damage = damageValue;
       bullet.life = enemy ? 4 : 2.2;
-      bullet.mesh.material = enemy ? pink : cyan;
+      bullet.mesh.material = enemy
+        ? pink
+        : owner === "ally" ? allyShotMaterial : playerShotMaterial;
       bullet.mesh.visible = true;
       bullet.mesh.position.copy(position);
       bullet.mesh.quaternion.setFromUnitVectors(new V3(0, 0, 1), direction);
       bullet.velocity.copy(direction).multiplyScalar(enemy ? 110 : 390);
 
-      if (!enemy) bullet.velocity.add(velocity);
+      if (!enemy && owner === "player") bullet.velocity.add(velocity);
       bullets.push(bullet);
     }
 
@@ -2011,6 +2182,9 @@
 
     function isExtremeDanger() {
       if (shield <= 45) return true;
+      if (boss.visible && boss.group.position.distanceToSquared(camera.position) < 360 * 360) {
+        return true;
+      }
 
       let threats = 0;
       for (const drone of drones) {
@@ -2076,6 +2250,13 @@
         drone.group.visible = false;
         drone.respawn = rand(3, 5.5);
         score += 150;
+      }
+
+      if (boss.visible && boss.group.position.distanceToSquared(center) <= radiusSq) {
+        boss.hp -= 14;
+        burst(boss.group.position, 0xff735c, 100, 45);
+        queueEvent("BOMBA // IMPACTO DIRETO NA NAVE-CHEFÃ", "alert");
+        if (boss.hp <= 0) destroyBoss();
       }
 
       for (let i = bullets.length - 1; i >= 0; i--) {
@@ -2175,7 +2356,7 @@
               camera.position, bullet.previous, bullet.mesh.position
             ) < 9
           ) {
-            shield = Math.max(0, shield - 9);
+            shield = Math.max(0, shield - bullet.damage);
             sinceDamage = 0;
             damage = 1;
             hit = true;
@@ -2209,6 +2390,17 @@
 
               break;
             }
+          }
+
+          if (!hit && boss.visible && segmentDistanceSquared(
+            boss.group.position, bullet.previous, bullet.mesh.position
+          ) < 19 * 19) {
+            boss.hp--;
+            hitTimer = .13;
+            hit = true;
+            burst(bullet.mesh.position, 0xff805f, 12, 14);
+
+            if (boss.hp <= 0) destroyBoss();
           }
 
           if (!hit) {
@@ -2891,6 +3083,18 @@
       particleGeo.attributes.color.needsUpdate = true;
 
       drones.forEach((drone, i) => placeDrone(drone, true, i));
+      allies.forEach(ally => {
+        ally.active = false;
+        ally.group.visible = false;
+      });
+      allySpawnTimer = rand(20, 32);
+      boss.visible = false;
+      boss.group.visible = false;
+      boss.hp = CONFIG.bossHp;
+      boss.respawn = rand(34, 48);
+      eventTimer = 4;
+      nextAmbientMessage = rand(5, 8);
+      queueEvent("COMANDO // CANAL TÁTICO CONECTADO");
       refreshSectors(true);
     }
 
@@ -3231,6 +3435,162 @@
       }
     }
 
+    function spawnAlliedSquadron() {
+      const count = Math.random() < .55 ? CONFIG.allies : CONFIG.allies - 1;
+
+      for (let i = 0; i < count; i++) {
+        const ally = allies[i];
+        const local = new V3((i - (count - 1) / 2) * 16, rand(5, 15), 22 + i * 7)
+          .applyQuaternion(camera.quaternion)
+          .add(camera.position);
+
+        ally.group.position.copy(local);
+        ally.group.quaternion.copy(camera.quaternion);
+        ally.group.visible = true;
+        ally.active = true;
+        ally.life = rand(17, 23);
+        ally.cooldown = rand(.2, .75);
+        ally.velocity.copy(velocity);
+      }
+
+      queueEvent(`COMANDO // ${count} NAVES ALIADAS ENTRARAM NO SETOR`, "ally");
+      allySpawnTimer = rand(42, 68);
+    }
+
+    function getClosestDrone(position) {
+      let selected = null;
+      let bestDistance = Infinity;
+
+      for (const drone of drones) {
+        if (!drone.group.visible) continue;
+        const distance = drone.group.position.distanceToSquared(position);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          selected = drone;
+        }
+      }
+
+      return selected;
+    }
+
+    function updateAllies(dt) {
+      allySpawnTimer -= dt;
+      if (allySpawnTimer <= 0 && !allies.some(ally => ally.active)) {
+        spawnAlliedSquadron();
+      }
+
+      for (const ally of allies) {
+        if (!ally.active) continue;
+
+        ally.life -= dt;
+        if (ally.life <= 0) {
+          ally.active = false;
+          ally.group.visible = false;
+          if (!allies.some(candidate => candidate.active)) {
+            queueEvent("ESQUADRÃO ALIADO // SALTO DE RETORNO CONFIRMADO", "ally");
+          }
+          continue;
+        }
+
+        const droneTarget = getClosestDrone(ally.group.position);
+        const targetPosition = boss.visible
+          ? boss.group.position
+          : droneTarget?.group.position;
+
+        if (!targetPosition) {
+          const escort = new V3(
+            (ally.index - 1) * 14,
+            8 + Math.sin(time + ally.phase) * 4,
+            28
+          ).applyQuaternion(camera.quaternion).add(camera.position);
+          temp.subVectors(escort, ally.group.position);
+          ally.velocity.lerp(temp.clampLength(0, 72), 1 - Math.exp(-2.4 * dt));
+        } else {
+          temp.subVectors(targetPosition, ally.group.position);
+          const distance = temp.length();
+          const desiredSpeed = distance > 105 ? 86 : distance < 55 ? -34 : 18;
+          temp.normalize().multiplyScalar(desiredSpeed);
+          temp.x += Math.sin(time * 1.7 + ally.phase) * 18;
+          ally.velocity.lerp(temp, 1 - Math.exp(-2.8 * dt));
+          ally.group.lookAt(targetPosition);
+
+          ally.cooldown -= dt;
+          if (ally.cooldown <= 0 && distance < 390) {
+            const direction = new V3().subVectors(targetPosition, ally.group.position).normalize();
+            const origin = ally.group.position.clone().addScaledVector(direction, 4);
+            spawnBullet(origin, direction, false, "ally", 1);
+            ally.cooldown = rand(.34, .58);
+          }
+        }
+
+        ally.group.position.addScaledVector(ally.velocity, dt);
+        ally.group.rotation.z = Math.sin(time * 2.2 + ally.phase) * .08;
+      }
+    }
+
+    function spawnBoss() {
+      const local = new V3(rand(-80, 80), rand(25, 70), -rand(390, 480))
+        .applyQuaternion(camera.quaternion)
+        .add(camera.position);
+
+      boss.group.position.copy(local);
+      boss.group.visible = true;
+      boss.visible = true;
+      boss.hp = CONFIG.bossHp;
+      boss.cooldown = 2.2;
+      queueEvent("ALERTA MÁXIMO // NAVE-CHEFÃ ENTROU NO SETOR", "alert");
+    }
+
+    function destroyBoss() {
+      if (!boss.visible) return;
+      burst(boss.group.position, 0xff3f62, 260, 110);
+      burst(boss.group.position, 0xb64dff, 190, 85);
+      boss.visible = false;
+      boss.group.visible = false;
+      boss.respawn = rand(70, 105);
+      score += 3000;
+      queueEvent("COMANDO // NAVE-CHEFÃ DESTRUÍDA · +3000 PTS", "ally");
+    }
+
+    function updateBoss(dt) {
+      if (!boss.visible) {
+        boss.respawn -= dt;
+        if (boss.respawn <= 0) spawnBoss();
+        return;
+      }
+
+      temp.subVectors(camera.position, boss.group.position);
+      const distance = temp.length();
+
+      if (distance > 1250 && warpTimer === 0) {
+        boss.visible = false;
+        boss.group.visible = false;
+        boss.respawn = rand(18, 28);
+        queueEvent("SENSORES // NAVE-CHEFÃ SAIU DO ALCANCE", "alert");
+        return;
+      }
+
+      temp.normalize();
+      const approach = distance > 270 ? 31 : distance < 185 ? -20 : 0;
+      boss.group.position.addScaledVector(temp, approach * dt);
+      boss.group.position.x += Math.sin(time * .42 + boss.phase) * dt * 13;
+      boss.group.position.y += Math.cos(time * .55 + boss.phase) * dt * 8;
+      boss.group.lookAt(camera.position);
+      boss.core.scale.setScalar(2.7 + Math.sin(time * 4.2) * .22);
+
+      boss.cooldown -= dt;
+      if (boss.cooldown <= 0 && distance < 620 && warpTimer === 0) {
+        for (let i = -1; i <= 1; i++) {
+          const origin = boss.group.position.clone();
+          const aim = camera.position.clone()
+            .addScaledVector(velocity, Math.min(distance / 170, 1) * .6)
+            .add(new V3(i * 8, rand(-5, 5), rand(-3, 3)));
+          spawnBullet(origin, aim.sub(origin).normalize(), true, "boss", 14);
+        }
+        boss.cooldown = rand(1.35, 2.15);
+      }
+    }
+
     // ============================================================
     // RADAR E HUD
     // ============================================================
@@ -3334,10 +3694,50 @@
             bestTarget = {
               x: (projected.x * .5 + .5) * innerWidth,
               y: (-projected.y * .5 + .5) * innerHeight,
-              distance: camera.position.distanceTo(drone.group.position)
+              distance: camera.position.distanceTo(drone.group.position),
+              label: "SENTINELA"
             };
           }
         }
+      }
+
+      if (boss.visible) {
+        radarVector.subVectors(boss.group.position, camera.position)
+          .applyQuaternion(inverseQuaternion);
+        let bx = radarVector.x * .42;
+        let by = radarVector.z * .42;
+        const bl = Math.hypot(bx, by);
+        if (bl > 106) { bx *= 106 / bl; by *= 106 / bl; }
+        radar.fillStyle = "#d657ff";
+        radar.beginPath();
+        radar.arc(120 + bx, 120 + by, 6, 0, Math.PI * 2);
+        radar.fill();
+
+        if (radarVector.z < 0) {
+          projected.copy(boss.group.position).project(camera);
+          const screenDistance = projected.x * projected.x + projected.y * projected.y;
+          if (projected.z < 1 && screenDistance < bestScreenDistance) {
+            bestScreenDistance = screenDistance;
+            bestTarget = {
+              x: (projected.x * .5 + .5) * innerWidth,
+              y: (-projected.y * .5 + .5) * innerHeight,
+              distance: camera.position.distanceTo(boss.group.position),
+              label: `CHEFÃO ${Math.ceil(boss.hp / CONFIG.bossHp * 100)}%`
+            };
+          }
+        }
+      }
+
+      for (const ally of allies) {
+        if (!ally.active) continue;
+        radarVector.subVectors(ally.group.position, camera.position)
+          .applyQuaternion(inverseQuaternion);
+        let ax = radarVector.x * .42;
+        let ay = radarVector.z * .42;
+        const al = Math.hypot(ax, ay);
+        if (al > 108) { ax *= 108 / al; ay *= 108 / al; }
+        radar.fillStyle = "#63f0a8";
+        radar.fillRect(117 + ax, 117 + ay, 6, 6);
       }
 
       for (const stationEntry of refuelStations) {
@@ -3366,7 +3766,7 @@
         ui.target.style.left = `${bestTarget.x}px`;
         ui.target.style.top = `${bestTarget.y}px`;
         ui.target.firstElementChild.textContent =
-          `SENTINELA / ${Math.round(bestTarget.distance)} M`;
+          `${bestTarget.label} / ${Math.round(bestTarget.distance)} M`;
       }
     }
 
@@ -3412,7 +3812,7 @@
       cinematic.uniforms.time.value = time;
       cinematic.uniforms.warp.value = warpVisual;
       cinematic.uniforms.damage.value = damage;
-      bloom.strength = 1.05 + warpVisual * .55;
+      bloom.strength = 1.0 + warpVisual * .55;
     }
 
     window.addEventListener("resize", () => {
@@ -3456,10 +3856,13 @@
         updatePlayer(dt);
         updateWorldObjects(dt);
         updateDrones(dt);
+        updateAllies(dt);
+        updateBoss(dt);
         updateBullets(dt);
         updateBombs(dt);
         updateParticles(dt);
         updateEnvironment(dt);
+        updateMissionEvents(dt);
       } else if (!started) {
         // Cena de apresentação animada sem iniciar o combate.
         time += dt;
