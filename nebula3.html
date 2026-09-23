@@ -864,6 +864,29 @@
           <span>Reproduzir música durante a missão</span>
         </label>
 
+        <label class="check-row">
+          <input id="effectsEnabled" type="checkbox" checked />
+          <span>Efeitos sonoros de combate</span>
+        </label>
+
+        <label for="sensitivity">Sensibilidade da mira: <output id="sensitivityValue">100%</output></label>
+        <input id="sensitivity" type="range" min="40" max="200" value="100" step="10" />
+
+        <label for="difficulty">Dificuldade (vale na próxima missão)</label>
+        <select id="difficulty">
+          <option value="easy">Explorador</option>
+          <option value="normal" selected>Padrão</option>
+          <option value="hard">Veterano</option>
+        </select>
+
+        <label for="quality">Qualidade gráfica</label>
+        <select id="quality">
+          <option value="low">Econômica</option>
+          <option value="auto" selected>Automática</option>
+          <option value="high">Alta</option>
+        </select>
+        <p id="bestScore">RECORDE // 000000 PTS</p>
+
         <audio
           id="bgMusic"
           controls
@@ -1029,6 +1052,78 @@
     const rand = (a, b) => a + Math.random() * (b - a);
     const clamp = THREE.MathUtils.clamp;
     const V3 = THREE.Vector3;
+    const BULLET_AXIS = new V3(0, 0, 1);
+    const UP_AXIS = new V3(0, 1, 0);
+    const STORAGE_KEY = "nebula3.preferences.v1";
+    let preferences = {};
+    try { preferences = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") || {}; } catch {}
+    const settings = {
+      effects: $("effectsEnabled"), sensitivity: $("sensitivity"),
+      difficulty: $("difficulty"), quality: $("quality"), best: $("bestScore")
+    };
+    const allowed = (value, values, fallback) => values.includes(value) ? value : fallback;
+    settings.difficulty.value = allowed(preferences.difficulty, ["easy", "normal", "hard"], "normal");
+    settings.quality.value = allowed(preferences.quality, ["low", "auto", "high"], "auto");
+    settings.sensitivity.value = clamp(Number(preferences.sensitivity) || 100, 40, 200);
+    settings.effects.checked = preferences.effects !== false;
+    const bestScore = Number.isFinite(preferences.bestScore) ? Math.max(0, preferences.bestScore) : 0;
+    let record = bestScore;
+    settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
+    $("sensitivityValue").textContent = `${settings.sensitivity.value}%`;
+    function savePreferences() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          difficulty: settings.difficulty.value, quality: settings.quality.value,
+          sensitivity: Number(settings.sensitivity.value), effects: settings.effects.checked,
+          touch: $("touchEnabled").checked, music: $("musicEnabled").checked,
+          track: $("musicSelect").value.startsWith("blob:") ? "" : $("musicSelect").value,
+          bestScore: record
+        }));
+      } catch { /* Armazenamento indisponível: a partida continua. */ }
+    }
+    for (const input of [settings.difficulty, settings.quality, settings.sensitivity, settings.effects]) {
+      input.addEventListener("change", savePreferences);
+    }
+    settings.sensitivity.addEventListener("input", () => {
+      $("sensitivityValue").textContent = `${settings.sensitivity.value}%`;
+    });
+    let missionDifficulty = settings.difficulty.value;
+    const difficultyScale = () => ({ easy: .7, normal: 1, hard: 1.4 })[missionDifficulty];
+    const aimSensitivity = () => Number(settings.sensitivity.value) / 100;
+
+    let audioContext = null;
+    const soundLast = new Map();
+    function wakeAudio() {
+      if (!settings.effects.checked) return;
+      try {
+        audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === "suspended") audioContext.resume().catch(() => {});
+      } catch { settings.effects.checked = false; }
+    }
+    function sound(kind) {
+      if (!audioContext || audioContext.state !== "running" || !settings.effects.checked) return;
+      const now = audioContext.currentTime;
+      if (now - (soundLast.get(kind) ?? -100) < (kind === "shot" ? .1 : .18)) return;
+      soundLast.set(kind, now);
+      const presets = {
+        shot: [520, 170, .09, .045, "sawtooth"],
+        hit: [130, 55, .16, .075, "square"],
+        blast: [110, 28, .65, .13, "sawtooth"],
+        alert: [430, 240, .32, .09, "triangle"]
+      };
+      const [start, end, duration, volume, wave] = presets[kind];
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = wave;
+      oscillator.frequency.setValueAtTime(start, now);
+      oscillator.frequency.exponentialRampToValueAtTime(end, now + duration);
+      gain.gain.setValueAtTime(volume, now);
+      gain.gain.exponentialRampToValueAtTime(.001, now + duration);
+      oscillator.connect(gain).connect(audioContext.destination);
+      oscillator.start(now);
+      oscillator.stop(now + duration);
+      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+    }
 
     const ui = {
       overlay: $("overlay"), title: $("title"), description: $("description"),
@@ -1438,6 +1533,13 @@
       }
     ];
 
+    function affectCivilization(changes, message) {
+      for (const [key, amount] of Object.entries(changes)) {
+        civilization[key] = clamp(civilization[key] + amount, 0, 100);
+      }
+      if (message) queueEvent(message, changes.stability < 0 ? "alert" : "ally");
+    }
+
     function resetCivilization() {
       Object.assign(civilization, {
         era: "COLÔNIA EMERGENTE",
@@ -1461,6 +1563,11 @@
       civilization.culture += .006 * stabilityFactor * dt;
       civilization.technology += .005 * (civilization.culture / 30) * dt;
       civilization.stability += (68 - civilization.stability) * .003 * dt;
+      const activeDrones = drones.reduce((count, drone) => count + Number(drone.group.visible), 0);
+      if (mothership.visible || activeDrones >= 7) {
+        civilization.stability -= (mothership.visible ? .16 : .05) * dt;
+        civilization.trade -= (mothership.visible ? .08 : .02) * dt;
+      }
 
       civilization.eventTimer -= dt;
       if (civilization.eventTimer <= 0 && eventTimer <= .2) {
@@ -2092,13 +2199,14 @@
     const particles = new THREE.Points(particleGeo, particleMaterial);
     particles.frustumCulled = false;
     scene.add(particles);
+    let visibleParticleCount = CONFIG.particles;
 
     function burst(position, hex, count = 70, force = 30) {
       const color = new THREE.Color(hex).multiplyScalar(4);
       const direction = new V3();
 
       for (let i = 0; i < count; i++) {
-        const index = particleCursor++ % CONFIG.particles;
+        const index = particleCursor++ % visibleParticleCount;
         const k = index * 3;
 
         position.toArray(particlePositions, k);
@@ -2159,6 +2267,9 @@
     function destroyStation(entry) {
       if (!entry || entry.destroyed) return;
       entry.destroyed = true;
+      sound("blast");
+      affectCivilization({ economy: -3, trade: -5, stability: -7 },
+        "AURORA // PERDA DE ESTAÇÃO AFETA ABASTECIMENTO E COMÉRCIO");
       const center = entry.group.position.clone();
 
       burst(center, 0xff542f, 250, 125);
@@ -2245,14 +2356,18 @@
         }
 
         if (explosion.life <= 0) {
-          for (const shock of explosion.shocks) {
-            scene.remove(shock.mesh);
-            shock.mesh.material.dispose();
-          }
-          for (const fragment of explosion.debris) scene.remove(fragment.mesh);
+          disposeStationExplosion(explosion);
           stationExplosions.splice(i, 1);
         }
       }
+    }
+
+    function disposeStationExplosion(explosion) {
+      for (const shock of explosion.shocks) {
+        scene.remove(shock.mesh);
+        shock.mesh.material.dispose();
+      }
+      for (const fragment of explosion.debris) scene.remove(fragment.mesh);
     }
 
     // ============================================================
@@ -2551,6 +2666,7 @@
       ui.eventFeed.style.opacity = "1";
       eventTimer = 4.2;
       nextAmbientMessage = rand(6, 10);
+      if (type === "alert" && active) sound("alert");
     }
 
     function updateMissionEvents(dt) {
@@ -2614,7 +2730,7 @@
         : owner === "ally" ? allyShotMaterial : playerShotMaterial;
       bullet.mesh.visible = true;
       bullet.mesh.position.copy(position);
-      bullet.mesh.quaternion.setFromUnitVectors(new V3(0, 0, 1), direction);
+      bullet.mesh.quaternion.setFromUnitVectors(BULLET_AXIS, direction);
       bullet.velocity.copy(direction).multiplyScalar(
         speedOverride ?? (enemy ? 110 : 390)
       );
@@ -2684,6 +2800,7 @@
     function detonateBomb(index) {
       const bomb = bombs[index];
       if (!bomb) return;
+      sound("blast");
       const center = bomb.mesh.position.clone();
       const radius = 240;
       const radiusSq = radius * radius;
@@ -2722,7 +2839,8 @@
         if (mothership.hp <= 0) destroyMothership();
       }
 
-      for (const stationEntry of [...refuelStations]) {
+      for (let s = refuelStations.length - 1; s >= 0; s--) {
+        const stationEntry = refuelStations[s];
         if (
           !stationEntry.destroyed && stationEntry.group.visible &&
           stationEntry.group.position.distanceToSquared(center) <= radiusSq
@@ -2816,6 +2934,7 @@
       if (heat >= 100) overheated = true;
 
       fireCooldown = .14;
+      sound("shot");
       cockpit.position.z = .085;
     }
 
@@ -2843,7 +2962,8 @@
           }
 
           if (!hit) {
-            for (const stationEntry of [...refuelStations]) {
+            for (let s = refuelStations.length - 1; s >= 0; s--) {
+              const stationEntry = refuelStations[s];
               if (stationEntry.destroyed || !stationEntry.group.visible) continue;
               if (segmentDistanceSquared(
                 stationEntry.group.position, bullet.previous, bullet.mesh.position
@@ -2915,7 +3035,8 @@
           }
 
           if (!hit && bullet.owner === "player") {
-            for (const stationEntry of [...refuelStations]) {
+            for (let s = refuelStations.length - 1; s >= 0; s--) {
+              const stationEntry = refuelStations[s];
               if (stationEntry.destroyed || !stationEntry.group.visible) continue;
               if (segmentDistanceSquared(
                 stationEntry.group.position, bullet.previous, bullet.mesh.position
@@ -2945,6 +3066,7 @@
         }
 
         if (hit || bullet.life <= 0) removeBullet(i);
+        if (hit) sound("hit");
       }
     }
 
@@ -2966,6 +3088,8 @@
 
     const musicURLs = new Set();
     let musicAttempt = 0;
+    musicEnabled.checked = preferences.music !== false;
+    musicSelect.value = allowed(preferences.track, ["youtube:huXVnd-QnNs", ""], "youtube:huXVnd-QnNs");
 
     function stopMusic() {
       musicAttempt++;
@@ -3079,28 +3203,32 @@
         new Option("Sem trilha sonora", "")
       );
 
+      let firstLocalURL = "";
       for (const file of files) {
         const url = URL.createObjectURL(file);
+        if (!firstLocalURL) firstLocalURL = url;
         musicURLs.add(url);
         musicSelect.add(new Option(file.name, url));
       }
 
-      musicSelect.selectedIndex = 2;
+      musicSelect.value = firstLocalURL;
       selectMusic();
 
       // Permite selecionar novamente os mesmos arquivos.
       musicFiles.value = "";
     });
 
-    musicSelect.addEventListener("change", selectMusic);
+    musicSelect.addEventListener("change", () => { selectMusic(); savePreferences(); });
 
     musicEnabled.addEventListener("change", () => {
+      savePreferences();
       if (musicEnabled.checked && active) {
         startMusic();
       } else {
         stopMusic();
       }
     });
+    selectMusic();
 
     bgMusic.addEventListener("error", () => {
       if (!musicSelect.value) return;
@@ -3155,11 +3283,12 @@
       flightMenu.hidden = !active;
     }
 
-    touchEnabled.checked = TOUCH_DEVICE;
+    touchEnabled.checked = typeof preferences.touch === "boolean" ? preferences.touch : TOUCH_DEVICE;
 
     touchEnabled.addEventListener("change", () => {
       clearTouchInput();
       syncControlUI();
+      savePreferences();
     });
 
     flightMenu.addEventListener("click", () => {
@@ -3289,7 +3418,7 @@
       aimX = event.clientX;
       aimY = event.clientY;
 
-      const sensitivity = 0.006;
+      const sensitivity = 0.006 * aimSensitivity();
 
       yaw -= dx * sensitivity;
       pitch -= dy * sensitivity;
@@ -3458,6 +3587,11 @@
         return;
       }
 
+      if (resetPressed && restartPending) {
+        reset();
+        play();
+        return;
+      }
       if (!active) return;
 
       if (bombPressed) launchBomb();
@@ -3468,10 +3602,7 @@
         charge = 0;
       }
 
-      if (resetPressed) {
-        reset();
-        play();
-      }
+      if (resetPressed) requestRestart();
     }
 
     window.addEventListener("gamepadconnected", event => {
@@ -3503,6 +3634,10 @@
     function play() {
       if (dead || !started) reset();
 
+      restartPending = false;
+
+      wakeAudio();
+
       started = true;
       active = true;
 
@@ -3519,6 +3654,11 @@
 
     function pause() {
       active = false;
+      if (score > record) {
+        record = score;
+        settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
+        savePreferences();
+      }
       mouseDown = false;
 
       keys.clear();
@@ -3552,7 +3692,26 @@
       ui.start.focus({ preventScroll: true });
     }
 
+    function requestRestart() {
+      if (!started || dead || !active) {
+        reset();
+        play();
+        return;
+      }
+      pause();
+      ui.description.textContent = "Missão pausada. Pressione R ou o botão 8 do joypad novamente para confirmar o reinício, ou continue para manter o progresso.";
+      restartPending = true;
+    }
+    let restartPending = false;
+
     function reset() {
+      restartPending = false;
+      missionDifficulty = settings.difficulty.value;
+      if (score > record) {
+        record = score;
+        settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
+        savePreferences();
+      }
       clearTouchInput();
 
       score = 0;
@@ -3590,14 +3749,7 @@
         scene.remove(bombs[bombs.length - 1].mesh);
         bombs.pop();
       }
-      while (stationExplosions.length) {
-        const explosion = stationExplosions.pop();
-        for (const shock of explosion.shocks) {
-          scene.remove(shock.mesh);
-          shock.mesh.material.dispose();
-        }
-        for (const fragment of explosion.debris) scene.remove(fragment.mesh);
-      }
+      while (stationExplosions.length) disposeStationExplosion(stationExplosions.pop());
 
       for (const key of Array.from(loadedSectors.keys())) unloadSector(key);
       destroyedWorldObjects.clear();
@@ -3628,12 +3780,12 @@
       allySpawnTimer = rand(20, 32);
       boss.visible = false;
       boss.group.visible = false;
-      boss.hp = CONFIG.bossHp;
-      boss.respawn = rand(34, 48);
+      boss.hp = Math.round(CONFIG.bossHp * difficultyScale());
+      boss.respawn = rand(34, 48) / difficultyScale();
       mothership.visible = false;
       mothership.group.visible = false;
-      mothership.hp = CONFIG.mothershipHp;
-      mothership.respawn = rand(65, 82);
+      mothership.hp = Math.round(CONFIG.mothershipHp * difficultyScale());
+      mothership.respawn = rand(65, 82) / difficultyScale();
       resetCivilization();
       eventTimer = 4;
       nextAmbientMessage = rand(5, 8);
@@ -3656,7 +3808,7 @@
           "input, select, textarea, button, audio, [contenteditable]"
         );
 
-      if (editingControl) return;
+      if (editingControl && !(event.code === "KeyR" && restartPending && event.target === ui.start)) return;
 
       if (handledKeys.has(event.code)) event.preventDefault();
 
@@ -3672,8 +3824,8 @@
         }
 
         if (event.code === "KeyR") {
-          reset();
-          play();
+          if (restartPending) { reset(); play(); }
+          else requestRestart();
           return;
         }
 
@@ -3701,8 +3853,8 @@
     document.addEventListener("mousemove", event => {
       if (!active || document.pointerLockElement !== renderer.domElement) return;
 
-      yaw -= event.movementX * .002;
-      pitch -= event.movementY * .002;
+      yaw -= event.movementX * .002 * aimSensitivity();
+      pitch -= event.movementY * .002 * aimSensitivity();
       pitch = clamp(pitch, -1.48, 1.48);
     });
 
@@ -4003,7 +4155,7 @@
             .add(new V3(rand(-3, 3), rand(-3, 3), rand(-3, 3)));
 
           spawnBullet(origin, aim.sub(origin).normalize(), true);
-          drone.cooldown = rand(1.9, 3.6);
+          drone.cooldown = rand(1.9, 3.6) / difficultyScale();
         }
       }
     }
@@ -4119,7 +4271,7 @@
       boss.group.position.copy(local);
       boss.group.visible = true;
       boss.visible = true;
-      boss.hp = CONFIG.bossHp;
+      boss.hp = Math.round(CONFIG.bossHp * difficultyScale());
       boss.cooldown = 2.2;
       queueEvent("ALERTA MÁXIMO // NAVE-CHEFÃ ENTROU NO SETOR", "alert");
     }
@@ -4130,8 +4282,10 @@
       burst(boss.group.position, 0xb64dff, 190, 85);
       boss.visible = false;
       boss.group.visible = false;
-      boss.respawn = rand(70, 105);
+      boss.respawn = rand(70, 105) / difficultyScale();
       score += 3000;
+      affectCivilization({ stability: 5, economy: 2 }, "AURORA // VITÓRIA ELEVA A CONFIANÇA DA COLÔNIA");
+      sound("blast");
       queueEvent("COMANDO // NAVE-CHEFÃ DESTRUÍDA · +3000 PTS", "ally");
     }
 
@@ -4148,7 +4302,7 @@
       if (distance > 1250 && warpTimer === 0) {
         boss.visible = false;
         boss.group.visible = false;
-        boss.respawn = rand(18, 28);
+        boss.respawn = rand(18, 28) / difficultyScale();
         queueEvent("SENSORES // NAVE-CHEFÃ SAIU DO ALCANCE", "alert");
         return;
       }
@@ -4182,7 +4336,7 @@
       mothership.group.position.copy(local);
       mothership.group.visible = true;
       mothership.visible = true;
-      mothership.hp = CONFIG.mothershipHp;
+      mothership.hp = Math.round(CONFIG.mothershipHp * difficultyScale());
       mothership.cooldown = 1.8;
       mothership.barrageCooldown = 4.2;
       mothership.salvo = 0;
@@ -4196,8 +4350,10 @@
       burst(mothership.group.position, 0x55ddff, 240, 90);
       mothership.visible = false;
       mothership.group.visible = false;
-      mothership.respawn = rand(120, 165);
+      mothership.respawn = rand(120, 165) / difficultyScale();
       score += 8000;
+      affectCivilization({ stability: 12, economy: 4, trade: 5 }, "AURORA // NAVE-MÃE DESTRUÍDA · ROTAS COMERCIAIS REABERTAS");
+      sound("blast");
       queueEvent("COMANDO // NAVE-MÃE DESTRUÍDA · +8000 PTS", "ally");
     }
 
@@ -4254,7 +4410,7 @@
         const target = chooseEnemyTarget(mothership.group.position);
         const origin = mothership.group.position.clone();
         const base = new V3().subVectors(target.position, origin).normalize();
-        const right = new V3().crossVectors(base, new V3(0, 1, 0));
+        const right = new V3().crossVectors(base, UP_AXIS);
         if (right.lengthSq() < .01) right.set(1, 0, 0);
         right.normalize();
         const up = new V3().crossVectors(right, base).normalize();
@@ -4283,6 +4439,11 @@
     const projected = new V3();
 
     function updateHUD() {
+      if (score > record) {
+        record = score;
+        settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
+        savePreferences();
+      }
       ui.score.textContent = `${String(score).padStart(6, "0")} PTS`;
       ui.speed.textContent = `${String(Math.round(velocity.length())).padStart(3, "0")} M/S`;
       ui.sector.textContent = `SETOR ${currentSector.x}.${currentSector.y}.${currentSector.z} // ${thirdPerson ? "3ª PESSOA" : "COCKPIT"}`;
@@ -4407,7 +4568,7 @@
               x: (projected.x * .5 + .5) * innerWidth,
               y: (-projected.y * .5 + .5) * innerHeight,
               distance: camera.position.distanceTo(mothership.group.position),
-              label: `NAVE-MÃE ${Math.ceil(mothership.hp / CONFIG.mothershipHp * 100)}%`
+              label: `NAVE-MÃE ${Math.ceil(mothership.hp / Math.round(CONFIG.mothershipHp * difficultyScale()) * 100)}%`
             };
           }
         }
@@ -4434,7 +4595,7 @@
               x: (projected.x * .5 + .5) * innerWidth,
               y: (-projected.y * .5 + .5) * innerHeight,
               distance: camera.position.distanceTo(boss.group.position),
-              label: `CHEFÃO ${Math.ceil(boss.hp / CONFIG.bossHp * 100)}%`
+              label: `CHEFÃO ${Math.ceil(boss.hp / Math.round(CONFIG.bossHp * difficultyScale()) * 100)}%`
             };
           }
         }
@@ -4524,8 +4685,22 @@
       cinematic.uniforms.time.value = time;
       cinematic.uniforms.warp.value = warpVisual;
       cinematic.uniforms.damage.value = damage;
-      bloom.strength = 1.0 + warpVisual * .55;
+      bloom.strength = (settings.quality.value === "low" ? .45 : 1.0) + warpVisual * .55;
     }
+
+    function applyQuality() {
+      const quality = settings.quality.value;
+      const ratio = quality === "low" ? .75 : quality === "high"
+        ? Math.min(window.devicePixelRatio || 1, 1.5) : CONFIG.pixelRatio;
+      renderer.setPixelRatio(ratio);
+      renderer.setSize(innerWidth, innerHeight);
+      composer.setPixelRatio(ratio);
+      composer.setSize(innerWidth, innerHeight);
+      starGeo.setDrawRange(0, quality === "low" ? Math.floor(CONFIG.stars * .4) : CONFIG.stars);
+      visibleParticleCount = quality === "low" ? Math.max(100, Math.floor(CONFIG.particles * .4)) : CONFIG.particles;
+      particleGeo.setDrawRange(0, visibleParticleCount);
+    }
+    settings.quality.addEventListener("change", applyQuality);
 
     window.addEventListener("resize", () => {
       camera.aspect = innerWidth / innerHeight;
@@ -4542,6 +4717,7 @@
       ui.start.disabled = true;
     });
 
+    applyQuality();
     reset();
 
     window.spaceReady = true;
