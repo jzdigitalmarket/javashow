@@ -10,7 +10,7 @@ export async function loadInterceptor(): Promise<Group> {
 
 export async function upgradeShipVisuals(
   player: Group,
-  allies: Array<{ group: Group; legacyHull: Object3D[] }>
+  allies: Array<{ group: Group; legacyHull: Object3D[]; tier: number }>
 ): Promise<void> {
   try {
     const model = await loadInterceptor();
@@ -19,6 +19,7 @@ export async function upgradeShipVisuals(
     player.add(model);
 
     for (const ally of allies) {
+      if (ally.tier !== 0) continue;
       const friendly = model.clone(true);
       friendly.traverse(object => {
         if (!(object instanceof Mesh)) return;
