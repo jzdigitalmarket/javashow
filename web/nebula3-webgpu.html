@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nebula 3 · laboratório gráfico</title>
+  <style>
+    :root { color-scheme: dark; font-family: ui-monospace, Consolas, monospace; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #050911; color: #e0faff; overflow: hidden; }
+    #preview { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    .panel { position: fixed; top: 1rem; left: 1rem; z-index: 2; max-width: min(26rem, calc(100% - 2rem));
+      padding: 1rem 1.25rem; border: 1px solid #58cde055; border-radius: .8rem;
+      background: #071721e8; box-shadow: 0 12px 45px #0008; }
+    h1 { font-size: 1.05rem; color: #7ae8ff; margin: 0 0 .65rem; }
+    p { line-height: 1.5; margin: .5rem 0; font-size: .82rem; }
+    a { color: #77e8ff; }
+    #backend { color: #77f8bc; font-weight: bold; }
+    .actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: .8rem; }
+    @media (max-width: 600px) { .panel { font-size: .8rem; } }
+  </style>
+</head>
+<body>
+  <canvas id="preview" aria-label="Visualização 3D de nave do Nebula 3"></canvas>
+  <div class="panel">
+    <h1>NEBULA 3 // LABORATÓRIO GRÁFICO</h1>
+    <p id="backend" role="status">Detectando renderizador...</p>
+    <p>Modelo glTF com materiais físicos. Arraste para girar e use a roda do mouse para aproximar.</p>
+    <p>Esta página testa WebGPU com retorno automático para WebGL 2. O combate atual continua no renderizador principal.</p>
+    <div class="actions">
+      <a href="./nebula3.html">Jogar Nebula 3</a>
+      <a href="?webgl=1">Comparar com WebGL 2</a>
+    </div>
+  </div>
+  <script type="module" src="../src/nebula3/webgpuLab.ts"></script>
+</body>
+</html>

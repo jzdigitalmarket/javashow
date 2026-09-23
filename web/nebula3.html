@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>NEXUS // Operação Órbita Fantasma</title>
+
+  <style>
+    :root {
+      --cyan: #63f7ff;
+      --muted: #83a5b9;
+      --pink: #ff467d;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #02040b;
+      color: #dcfbff;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    canvas#world {
+      display: block;
+      position: fixed;
+      inset: 0;
+    }
+
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      user-select: none;
+      z-index: 2;
+    }
+
+    #hud::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        transparent 0 3px,
+        rgba(100, 220, 255, .018) 3px 4px
+      );
+      box-shadow: inset 0 0 130px #00101d90;
+    }
+
+    .top {
+      position: absolute;
+      top: 25px;
+      left: 28px;
+      right: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    .brand {
+      color: var(--cyan);
+      font-size: 25px;
+      font-weight: 900;
+      letter-spacing: 7px;
+      text-shadow: 0 0 25px #00cfff80;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 3px;
+      margin-top: 8px;
+    }
+
+    .telemetry {
+      text-align: right;
+      font-size: 12px;
+      line-height: 1.9;
+      color: var(--cyan);
+    }
+
+    #reticle {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 34px;
+      height: 34px;
+      transform: translate(-50%, -50%);
+      border: 1px solid #72efff77;
+      border-radius: 50%;
+      box-shadow: 0 0 15px #00cfff22;
+    }
+
+    #reticle::before, #reticle::after {
+      content: "";
+      position: absolute;
+      background: #affaff;
+    }
+
+    #reticle::before {
+      width: 2px;
+      height: 10px;
+      left: 15px;
+      top: 11px;
+    }
+
+    #reticle::after {
+      height: 2px;
+      width: 10px;
+      top: 15px;
+      left: 11px;
+    }
+
+    #reticle.hit {
+      border-color: #ffbd69;
+      box-shadow: 0 0 25px #ff7648;
+    }
+
+    #target {
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      transform: translate(-50%, -50%);
+      border: 1px dashed #ff557a;
+      color: #ff9bab;
+      display: none;
+    }
+
+    #target span {
+      position: absolute;
+      top: 69px;
+      left: -14px;
+      width: 110px;
+      text-align: center;
+      font-size: 10px;
+    }
+
+    #message {
+      position: absolute;
+      top: 20%;
+      width: 100%;
+      text-align: center;
+      font-size: 12px;
+      letter-spacing: 5px;
+      color: var(--cyan);
+      text-shadow: 0 0 20px #00dfff;
+    }
+
+    .bottom {
+      position: absolute;
+      bottom: 28px;
+      left: 28px;
+      width: 230px;
+      padding: 18px;
+      border: 1px solid #51ddff33;
+      background: linear-gradient(120deg, #021725cc, #03101d55);
+      backdrop-filter: blur(6px);
+    }
+
+    .meter { margin: 12px 0; }
+
+    .label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 7px;
+      font-size: 10px;
+      letter-spacing: 2px;
+    }
+
+    .track {
+      height: 4px;
+      background: #b6ebff15;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      width: 100%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan);
+      transform-origin: left;
+    }
+
+    #heatBar { background: #ff8d59; }
+    #warpBar { background: #b28aff; }
+    #fuelBar { background: #57f0a1; }
+    #bombBar { background: #ffb45c; }
+
+    #radarBox {
+      position: absolute;
+      right: 28px;
+      bottom: 28px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 3px;
+    }
+
+    #radar {
+      display: block;
+      width: 160px;
+      height: 160px;
+      margin-top: 10px;
+    }
+
+    #hint {
+      position: absolute;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      width: 40%;
+      text-align: center;
+      font-size: 10px;
+      line-height: 1.8;
+      color: #82afc0;
+    }
+
+    #eventFeed {
+      position: absolute;
+      left: 50%;
+      bottom: 76px;
+      transform: translateX(-50%);
+      width: min(680px, 58vw);
+      min-height: 32px;
+      padding: 8px 18px;
+      border-left: 2px solid #63f7ff88;
+      border-right: 2px solid #63f7ff88;
+      background: linear-gradient(90deg, transparent, #031725cc 18%, #031725cc 82%, transparent);
+      color: #aeefff;
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.45;
+      letter-spacing: 2px;
+      text-shadow: 0 0 8px #001b2b;
+      transition: opacity .35s ease, color .2s ease;
+    }
+
+    #eventFeed.alert { color: #ff7898; border-color: #ff557a99; }
+    #eventFeed.ally { color: #72ffc4; border-color: #57f0a199; }
+
+    #civilizationPanel {
+      position: absolute;
+      top: 112px;
+      right: 28px;
+      width: 250px;
+      padding: 14px 16px;
+      border: 1px solid #9d7cff55;
+      background: linear-gradient(135deg, #100b22d9, #031624c9);
+      color: #b8d9e7;
+      font-size: 9px;
+      line-height: 1.65;
+      letter-spacing: 1px;
+      backdrop-filter: blur(6px);
+    }
+
+    #civilizationPanel strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #d4c1ff;
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+
+    #civilizationPanel .civ-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 12px;
+    }
+
+    #civilizationPanel .civ-value { color: #72ffc4; text-align: right; }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: radial-gradient(ellipse, #071625aa, #01030bed);
+      backdrop-filter: blur(8px);
+    }
+
+    .panel {
+      width: min(620px, 100%);
+      padding: 42px;
+      border: 1px solid #64ecff44;
+      background: linear-gradient(145deg, #092137dd, #060916ee);
+      box-shadow: 0 0 100px #008cff16, inset 0 0 60px #00b7ff08;
+    }
+
+    .eyebrow {
+      color: var(--cyan);
+      letter-spacing: 5px;
+      font-size: 10px;
+    }
+
+    h1 {
+      font-size: clamp(35px, 7vw, 64px);
+      letter-spacing: -3px;
+      line-height: .98;
+      margin: 24px 0;
+    }
+
+    h1 em { color: var(--cyan); font-style: normal; }
+
+    .panel p {
+      color: #a1bacb;
+      line-height: 1.8;
+      font-size: 13px;
+    }
+
+    .keys {
+      border-top: 1px solid #70dfff25;
+      border-bottom: 1px solid #70dfff25;
+      padding: 15px 0;
+      margin: 24px 0;
+      line-height: 2;
+      color: #c5ecff;
+      font-size: 12px;
+    }
+
+    button {
+      width: 100%;
+      padding: 17px;
+      border: 1px solid #8af9ff;
+      background: #71f4ff;
+      color: #031523;
+      font: bold 12px ui-monospace, monospace;
+      letter-spacing: 3px;
+      cursor: pointer;
+    }
+
+    button:hover { background: #c7ffff; }
+    button:disabled { opacity: .45; cursor: wait; }
+
+    #status { font-size: 11px; margin-bottom: 0; }
+    .small { font-size: 10px !important; opacity: .75; }
+
+    @media (max-width: 700px) {
+      .top { top: 15px; left: 15px; right: 15px; }
+      .brand { font-size: 19px; }
+      .subtitle { letter-spacing: 1px; }
+      .bottom { width: 180px; left: 15px; bottom: 15px; padding: 12px; }
+      #radarBox { right: 15px; bottom: 15px; }
+      #radar { width: 120px; height: 120px; }
+      #hint { display: none; }
+      #eventFeed { bottom: 22px; width: 68vw; font-size: 9px; letter-spacing: 1px; }
+      #civilizationPanel { display: none; }
+      .panel { padding: 25px; }
+    }
+
+    /* ============================================================
+       MÚSICA, MENU E CONTROLES TOUCH
+       ============================================================ */
+
+    [hidden] {
+      display: none !important;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    audio:focus-visible,
+    .touch-pad:focus-visible {
+      outline: 3px solid #ffe082;
+      outline-offset: 4px;
+    }
+
+    button,
+    select,
+    input[type="file"] {
+      min-height: 48px;
+    }
+
+    canvas#world {
+      touch-action: none;
+    }
+
+    /* Permite acessar todo o menu em telas baixas. */
+    #overlay {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding:
+        max(16px, env(safe-area-inset-top))
+        max(16px, env(safe-area-inset-right))
+        max(16px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+    }
+
+    #overlay .panel {
+      flex-shrink: 0;
+      margin-block: auto;
+    }
+
+    .settings {
+      border: 1px solid #64ecff44;
+      padding: 16px;
+      margin: 20px 0;
+      min-width: 0;
+    }
+
+    .settings legend {
+      padding: 0 8px;
+      color: var(--cyan);
+      font-size: 12px;
+    }
+
+    .settings > label:not(.check-row) {
+      display: block;
+      color: #dcfbff;
+      margin: 12px 0 8px;
+      font-size: 13px;
+    }
+
+    .settings select,
+    .settings input[type="file"] {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      border: 1px solid #64ecff66;
+      border-radius: 6px;
+      background: #061523;
+      color: #dcfbff;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    .settings select option {
+      background: #061523;
+      color: #dcfbff;
+    }
+
+    .settings input[type="file"]::file-selector-button {
+      min-height: 40px;
+      margin-right: 10px;
+      border: 0;
+      border-radius: 4px;
+      background: #71f4ff;
+      color: #031523;
+      padding: 8px;
+      cursor: pointer;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+      margin-top: 8px;
+      color: #dcfbff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .check-row input {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+      accent-color: #63f7ff;
+    }
+
+    #bgMusic,
+    #youtubeMusic {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    #youtubeMusic {
+      aspect-ratio: 16 / 9;
+      min-height: 200px;
+      border: 1px solid #64ecff44;
+      border-radius: 6px;
+      background: #02040b;
+    }
+
+    #musicStatus {
+      color: #b5d6e6;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    #flightMenu {
+      position: fixed;
+      z-index: 4;
+      top: max(82px, calc(env(safe-area-inset-top) + 70px));
+      right: max(16px, env(safe-area-inset-right));
+      width: auto;
+      min-height: 48px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #062638e8;
+      color: #dcfbff;
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+
+    #touchControls {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
+      --pad-size: clamp(100px, 28vw, 132px);
+    }
+
+    .touch-pad {
+      position: absolute;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      width: var(--pad-size);
+      height: var(--pad-size);
+      border: 2px solid #63f7ff80;
+      border-radius: 50%;
+      background: #041a2cbb;
+      box-shadow: inset 0 0 25px #21cfff18;
+      pointer-events: auto;
+      touch-action: none;
+      display: grid;
+      place-items: center;
+      color: #d5faff;
+      text-align: center;
+    }
+
+    #movePad {
+      left: max(18px, env(safe-area-inset-left));
+    }
+
+    #aimPad {
+      right: max(18px, env(safe-area-inset-right));
+      border-color: #c59aff99;
+    }
+
+    #moveKnob {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border: 1px solid #b7fbff;
+      border-radius: 50%;
+      background: #63f7ff55;
+      pointer-events: none;
+    }
+
+    .pad-label {
+      position: absolute;
+      bottom: 10px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+
+    #aimPad span {
+      font-size: 12px;
+      line-height: 1.5;
+      pointer-events: none;
+    }
+
+    .touch-actions {
+      position: absolute;
+      left: 50%;
+      bottom: calc(
+        max(18px, env(safe-area-inset-bottom)) + var(--pad-size) + 12px
+      );
+      transform: translateX(-50%);
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      pointer-events: auto;
+    }
+
+    .touch-actions button {
+      width: 48px;
+      min-height: 50px;
+      padding: 6px 2px;
+      border: 1px solid #63f7ff99;
+      border-radius: 8px;
+      background: #062638e8;
+      color: #dcfbff;
+      font-size: 10px;
+      letter-spacing: 0;
+      touch-action: none;
+    }
+
+    .touch-actions button.pressed {
+      background: #63f7ff;
+      color: #031523;
+      box-shadow: 0 0 18px #63f7ff55;
+    }
+
+    #touchFire {
+      border-color: #ff7799;
+      background: #46152be8;
+    }
+
+    #touchHelp {
+      display: none;
+    }
+
+    body.touch-ui .top {
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      gap: 8px;
+    }
+
+    body.touch-ui .brand {
+      font-size: 17px;
+      letter-spacing: 3px;
+    }
+
+    body.touch-ui .subtitle {
+      max-width: 170px;
+      font-size: 9px;
+      letter-spacing: 1px;
+    }
+
+    body.touch-ui .telemetry {
+      font-size: 10px;
+    }
+
+    body.touch-ui .bottom {
+      top: max(82px, calc(env(safe-area-inset-top) + 72px));
+      left: max(12px, env(safe-area-inset-left));
+      bottom: auto;
+      width: 145px;
+      padding: 8px;
+    }
+
+    body.touch-ui .meter {
+      margin: 8px 0;
+    }
+
+    body.touch-ui .label {
+      font-size: 9px;
+      letter-spacing: 0;
+    }
+
+    body.touch-ui #radarBox {
+      top: max(140px, calc(env(safe-area-inset-top) + 130px));
+      right: max(12px, env(safe-area-inset-right));
+      bottom: auto;
+      font-size: 8px;
+      letter-spacing: 1px;
+    }
+
+    body.touch-ui #radar {
+      width: 82px;
+      height: 82px;
+      margin-top: 4px;
+    }
+
+    body.touch-ui #message {
+      top: 40%;
+      padding: 0 12px;
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+
+    body.touch-ui #hint,
+    body.touch-ui #desktopHelp {
+      display: none;
+    }
+
+    body.touch-ui #eventFeed {
+      left: 50%;
+      bottom: calc(max(18px, env(safe-area-inset-bottom)) + var(--pad-size) + 76px);
+      width: min(62vw, 430px);
+      padding: 6px 10px;
+      font-size: 9px;
+      letter-spacing: 1px;
+    }
+
+    body.touch-ui #civilizationPanel { display: none; }
+
+    body.touch-ui #touchHelp {
+      display: block;
+    }
+
+    @media (max-width: 700px) {
+      #overlay .panel {
+        padding: 22px;
+      }
+
+      .settings {
+        padding: 12px;
+      }
+
+      .panel p {
+        font-size: 14px;
+      }
+
+      .keys {
+        font-size: 12px;
+        margin: 16px 0;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 540px) {
+      body.touch-ui #radarBox {
+        display: none;
+      }
+
+      body.touch-ui .bottom {
+        width: 130px;
+        top: 70px;
+      }
+
+      body.touch-ui #message {
+        top: 22%;
+      }
+
+      body.touch-ui #touchControls {
+        --pad-size: 100px;
+      }
+
+      body.touch-ui .touch-actions {
+        bottom: max(18px, env(safe-area-inset-bottom));
+      }
+    }
+
+  </style>
+
+</head>
+
+<body>
+  <div id="hud">
+    <div class="top">
+      <div>
+        <div class="brand">NEXUS / 07</div>
+        <div class="subtitle">DIVISÃO DE ROBÓTICA ORBITAL</div>
+      </div>
+      <div class="telemetry">
+        <div id="score">000000 PTS</div>
+        <div id="speed">000 M/S</div>
+        <div id="sector">SETOR FANTASMA</div>
+      </div>
+    </div>
+
+    <div id="reticle"></div>
+    <div id="target"><span></span></div>
+    <div id="message">SISTEMAS EM ESPERA</div>
+
+    <div class="bottom">
+      <div class="meter">
+        <div class="label"><span>ESCUDO</span><span id="shieldValue">100%</span></div>
+        <div class="track"><div id="shieldBar" class="fill"></div></div>
+      </div>
+      <div class="meter">
+        <div class="label"><span>TEMPERATURA</span><span id="heatValue">0%</span></div>
+        <div class="track"><div id="heatBar" class="fill"></div></div>
+      </div>
+      <div class="meter">
+        <div class="label"><span>SALTO / F</span><span id="warpValue">100%</span></div>
+        <div class="track"><div id="warpBar" class="fill"></div></div>
+      </div>
+      <div class="meter">
+        <div class="label"><span>COMBUSTÍVEL</span><span id="fuelValue">100%</span></div>
+        <div class="track"><div id="fuelBar" class="fill"></div></div>
+      </div>
+      <div class="meter">
+        <div class="label"><span>BOMBA / B / RMB</span><span id="bombValue">2/2</span></div>
+        <div class="track"><div id="bombBar" class="fill"></div></div>
+      </div>
+    </div>
+
+    <div id="radarBox">
+      SENSOR TÁTICO
+      <canvas id="radar" width="240" height="240"></canvas>
+    </div>
+
+    <div id="hint">
+      WASD · ESPAÇO / CTRL · SHIFT TURBO<br>
+      MOUSE / SETAS MIRAR · J/ESQUERDO ATIRAR · B/DIREITO BOMBA · V VISÃO · F SALTO · P PAUSA
+    </div>
+
+    <div id="eventFeed" role="status" aria-live="polite">
+      COMANDO // CANAL TÁTICO CONECTADO
+    </div>
+
+    <div id="civilizationPanel">
+      <strong id="civTitle">PLANETA AURORA // COLÔNIA</strong>
+      <div class="civ-grid">
+        <span>POPULAÇÃO</span><span id="civPopulation" class="civ-value">1,20 BI</span>
+        <span>GOVERNO</span><span id="civGovernment" class="civ-value">CONSELHO</span>
+        <span>ECONOMIA</span><span id="civEconomy" class="civ-value">18</span>
+        <span>COMÉRCIO</span><span id="civTrade" class="civ-value">8</span>
+        <span>CULTURA</span><span id="civCulture" class="civ-value">16</span>
+        <span>TECNOLOGIA</span><span id="civTechnology" class="civ-value">12</span>
+        <span>ESTABILIDADE</span><span id="civStability" class="civ-value">72%</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <div class="panel">
+      <div class="eyebrow">EXPERIMENTO INTERATIVO // THREE.JS</div>
+      <h1 id="title">ÓRBITA<br><em>FANTASMA.</em></h1>
+      <p id="description">
+        Pilote um interceptador experimental entre máquinas autônomas,
+        ruínas orbitais e tempestades de plasma. Elimine os sentinelas.
+        Preserve seu escudo.
+      </p>
+
+      <div class="keys">
+        <div id="desktopHelp">
+          WASD — movimentar / MOUSE ou SETAS — mirar<br>
+          ESPAÇO / CTRL — subir e descer<br>
+          CLIQUE ESQUERDO ou J — disparar / SHIFT — turbo<br>
+          CLIQUE DIREITO ou B — bomba / V — alternar 1ª/3ª pessoa<br>
+          F — hipervelocidade / P — pausa / R — reiniciar<br>
+          JOYPAD XBOX — esquerdo mirar · direito mover · A/RB atirar · B bomba · RT avançar · LT turbo<br>
+          A subir · X descer · B bomba · Y visão · LB salto · MENU pausa
+        </div>
+
+        <div id="touchHelp">
+          Direcional esquerdo — movimentar<br>
+          Arraste na área direita — mirar<br>
+          Segure TIRO, TURBO, SUBIR ou DESCER para usar<br>
+          Use BOMBA em perigo crítico / SALTO para hipervelocidade<br>
+          VISÃO alterna 1ª/3ª pessoa / PAUSA abre o menu
+        </div>
+      </div>
+
+      <fieldset class="settings">
+        <legend>TRILHA SONORA E CONTROLES</legend>
+
+        <label for="musicFiles">Adicionar músicas do dispositivo</label>
+        <input
+          id="musicFiles"
+          type="file"
+          accept="audio/*"
+          multiple
+          aria-describedby="musicStatus"
+        />
+
+        <label for="musicSelect">Trilha de fundo</label>
+        <select id="musicSelect">
+          <option value="youtube:huXVnd-QnNs" selected>Trilha padrão — YouTube</option>
+          <option value="">Sem trilha sonora</option>
+        </select>
+
+        <label class="check-row">
+          <input id="musicEnabled" type="checkbox" checked />
+          <span>Reproduzir música durante a missão</span>
+        </label>
+
+        <label class="check-row">
+          <input id="effectsEnabled" type="checkbox" checked />
+          <span>Efeitos sonoros de combate</span>
+        </label>
+
+        <label for="effectsVolume">Volume dos efeitos: <output id="effectsVolumeValue">60%</output></label>
+        <input id="effectsVolume" type="range" min="0" max="100" value="60" step="5" />
+        <button id="previewEffects" type="button">OUVIR EFEITOS</button>
+
+        <label for="sensitivity">Sensibilidade da mira: <output id="sensitivityValue">100%</output></label>
+        <input id="sensitivity" type="range" min="40" max="200" value="100" step="10" />
+
+        <label for="difficulty">Dificuldade (vale na próxima missão)</label>
+        <select id="difficulty">
+          <option value="easy">Explorador</option>
+          <option value="normal" selected>Padrão</option>
+          <option value="hard">Veterano</option>
+        </select>
+
+        <label for="quality">Qualidade gráfica</label>
+        <select id="quality">
+          <option value="low">Econômica</option>
+          <option value="auto" selected>Automática</option>
+          <option value="high">Alta</option>
+        </select>
+        <p id="bestScore">RECORDE // 000000 PTS</p>
+
+        <audio
+          id="bgMusic"
+          controls
+          loop
+          preload="metadata"
+          aria-label="Prévia e controles da trilha sonora"
+          hidden
+        ></audio>
+
+        <iframe
+          id="youtubeMusic"
+          title="Player da trilha sonora padrão no YouTube"
+          src="https://www.youtube-nocookie.com/embed/huXVnd-QnNs?enablejsapi=1&controls=1&rel=0"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        ></iframe>
+
+        <p id="musicStatus" role="status" aria-live="polite">
+          Trilha padrão do YouTube selecionada. Ela começará ao iniciar a missão.
+        </p>
+
+        <label class="check-row">
+          <input id="touchEnabled" type="checkbox" />
+          <span>Exibir controles de toque</span>
+        </label>
+
+        <p id="gamepadStatus" role="status" aria-live="polite">
+          Joypad: aguardando conexão.
+        </p>
+      </fieldset>
+
+      <button id="start" disabled>CARREGANDO SISTEMAS...</button>
+      <p id="status">Inicializando renderização e shaders.</p>
+      <p class="small">
+        Compatível com teclado, mouse e controles de toque.
+        No smartphone, experimente jogar com a tela deitada.
+        Contém flashes e movimento intenso.
+      </p>
+    </div>
+  </div>
+
+  <button
+    id="flightMenu"
+    type="button"
+    aria-label="Pausar missão e abrir configurações"
+    hidden
+  >
+    PAUSA / MENU
+  </button>
+
+  <div id="touchControls" hidden>
+    <div
+      id="movePad"
+      class="touch-pad"
+      role="group"
+      aria-label="Direcional de movimento por toque"
+    >
+      <div id="moveKnob"></div>
+      <span class="pad-label">MOVER</span>
+    </div>
+
+    <div
+      id="aimPad"
+      class="touch-pad"
+      role="group"
+      aria-label="Área de mira: arraste o dedo para orientar a nave"
+    >
+      <span>ARRASTE<br>PARA MIRAR</span>
+    </div>
+
+    <div class="touch-actions" role="group" aria-label="Ações da nave">
+      <button id="touchUp" type="button" aria-label="Subir">
+        SUBIR
+      </button>
+
+      <button id="touchDown" type="button" aria-label="Descer">
+        DESCER
+      </button>
+
+      <button id="touchBoost" type="button" aria-label="Ativar turbo">
+        TURBO
+      </button>
+
+      <button id="touchWarp" type="button" aria-label="Ativar salto">
+        SALTO
+      </button>
+
+      <button id="touchFire" type="button" aria-label="Disparar">
+        TIRO
+      </button>
+
+      <button id="touchBomb" type="button" aria-label="Lançar bomba de emergência">
+        BOMBA
+      </button>
+
+      <button id="touchView" type="button" aria-label="Alternar primeira e terceira pessoa">
+        VISÃO
+      </button>
+    </div>
+  </div>
+
+  <script>
+    window.spaceReady = false;
+
+    window.addEventListener("error", () => {
+      if (!window.spaceReady) {
+        document.getElementById("status").textContent =
+          "Falha ao iniciar. Confira a conexão, o suporte a WebGL2 e o console do navegador.";
+      }
+    });
+
+    setTimeout(() => {
+      if (!window.spaceReady) {
+        document.getElementById("status").textContent =
+          "O carregamento está demorando. Verifique os arquivos do jogo e o suporte gráfico do navegador.";
+      }
+    }, 15000);
+  </script>
+
+  <script type="module" src="../src/nebula3/game.js"></script>
+</body>
+</html>
