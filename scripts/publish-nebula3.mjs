@@ -19,7 +19,7 @@ for (const name of previous) {
 for (const name of newAssets) {
   await copyFile(resolve(generated, 'assets', name), resolve(assetDirectory, name));
 }
-await copyFile(resolve(generated, 'nebula3.html'), resolve(root, 'nebula3.html'));
-await copyFile(resolve(generated, 'nebula3-webgpu.html'), resolve(root, 'nebula3-webgpu.html'));
+await copyFile(resolve(generated, 'web/nebula3.html'), resolve(root, 'nebula3.html'));
+await copyFile(resolve(generated, 'web/nebula3-webgpu.html'), resolve(root, 'nebula3-webgpu.html'));
 await writeFile(manifestPath, JSON.stringify(newAssets, null, 2) + '\n');
 console.log(`Nebula 3 publicado no diretório raiz com ${newAssets.length} arquivos gerados.`);

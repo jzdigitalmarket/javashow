@@ -1,9 +1,9 @@
 import { Color, Group, Mesh, MeshStandardMaterial, Object3D } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import interceptorUrl from '../../models/interceptor.glb?url';
 import bossUrl from '../../models/boss.glb?url';
 
 export async function loadInterceptor(): Promise<Group> {
+  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
   const { scene } = await new GLTFLoader().loadAsync(interceptorUrl);
   return scene;
 }
@@ -39,6 +39,7 @@ export async function upgradeShipVisuals(
 
 export async function upgradeBossVisual(boss: { group: Group; legacyHull: Object3D[] }): Promise<void> {
   try {
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
     const { scene } = await new GLTFLoader().loadAsync(bossUrl);
     for (const old of boss.legacyHull) boss.group.remove(old);
     boss.group.add(scene);

@@ -5,11 +5,6 @@
     import { createCapitalShip } from "./capitalShip.ts";
     import { segmentDistanceSquared } from "./collision.ts";
     import { moveAgainstSolids } from "./solidCollision.ts";
-    import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-    import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-    import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-    import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
-    import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
     // ============================================================
     // CONFIGURAÇÃO
@@ -116,60 +111,25 @@
     violetLight.position.set(-300, -80, -300);
     scene.add(violetLight);
 
-    const composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
+    let composer = null;
+    let bloom = null;
+    let cinematic = null;
+    let postprocessingLoading = null;
 
-    const bloom = new UnrealBloomPass(
-      new THREE.Vector2(innerWidth, innerHeight), 1.05, 0.55, 1.0
-    );
-    composer.addPass(bloom);
-
-    const cinematic = new ShaderPass({
-      uniforms: {
-        tDiffuse: { value: null },
-        time: { value: 0 },
-        warp: { value: 0 },
-        damage: { value: 0 }
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D tDiffuse;
-        uniform float time, warp, damage;
-        varying vec2 vUv;
-
-        void main() {
-          vec2 p = vUv - .5;
-          float r = length(p);
-
-          vec2 uv = .5 + p * (1. - warp * .055 * r);
-          vec2 offset = p * (.0015 + warp * .025 + damage * .008);
-
-          vec3 color;
-          color.r = texture2D(tDiffuse, uv + offset).r;
-          color.g = texture2D(tDiffuse, uv).g;
-          color.b = texture2D(tDiffuse, uv - offset).b;
-
-          float vignette = 1. - smoothstep(.24, .76, r) * .55;
-          color *= vignette;
-
-          float grain = fract(sin(dot(vUv + time,
-                        vec2(12.9898, 78.233))) * 43758.5453);
-          color += (grain - .5) * .012;
-          color += vec3(.5, .015, .035) * damage * smoothstep(.12, .7, r);
-
-          gl_FragColor = vec4(color, 1.);
-        }
-      `
-    });
-
-    composer.addPass(cinematic);
-    composer.addPass(new OutputPass());
+    function requestPostprocessing() {
+      if (composer || postprocessingLoading) return;
+      postprocessingLoading = import("./postprocessing.ts")
+        .then(({ createPostprocessing }) => {
+          ({ composer, bloom, cinematic } = createPostprocessing(
+            renderer, scene, camera, innerWidth, innerHeight
+          ));
+          applyQuality();
+        })
+        .catch(error => {
+          postprocessingLoading = null;
+          console.warn("Pós-processamento indisponível; renderização direta ativa.", error);
+        });
+    }
 
     // ============================================================
     // MATERIAIS E GEOMETRIAS COMPARTILHADOS
@@ -1565,7 +1525,7 @@
     }
 
     const allies = Array.from({ length: CONFIG.allies }, (_, i) => createAlly(i));
-    void upgradeShipVisuals(shipExterior, allies);
+    let shipVisualsRequested = false;
     let allySpawnTimer = rand(9, 15);
 
     function createBoss() {
@@ -1609,7 +1569,7 @@
     }
 
     const boss = createBoss();
-    void upgradeBossVisual(boss);
+    let bossVisualRequested = false;
 
     // ============================================================
     // NAVE-MÃE INIMIGA
@@ -2976,6 +2936,10 @@
 
     function play() {
       if (dead || !started) reset();
+      if (!shipVisualsRequested) {
+        shipVisualsRequested = true;
+        void upgradeShipVisuals(shipExterior, allies);
+      }
 
       restartPending = false;
 
@@ -2983,6 +2947,7 @@
 
       started = true;
       active = true;
+      if (settings.quality.value !== "low") requestPostprocessing();
 
       ui.overlay.style.display = "none";
 
@@ -3635,6 +3600,10 @@
     }
 
     function spawnBoss() {
+      if (!bossVisualRequested) {
+        bossVisualRequested = true;
+        void upgradeBossVisual(boss);
+      }
       const local = new V3(rand(-80, 80), rand(25, 70), -rand(390, 480))
         .applyQuaternion(camera.quaternion)
         .add(camera.position);
@@ -4076,10 +4045,12 @@
 
       streakGeo.attributes.position.needsUpdate = true;
 
-      cinematic.uniforms.time.value = time;
-      cinematic.uniforms.warp.value = warpVisual;
-      cinematic.uniforms.damage.value = damage;
-      bloom.strength = (settings.quality.value === "low" ? .45 : 1.0) + warpVisual * .55;
+      if (cinematic && bloom) {
+        cinematic.uniforms.time.value = time;
+        cinematic.uniforms.warp.value = warpVisual;
+        cinematic.uniforms.damage.value = damage;
+        bloom.strength = 1.0 + warpVisual * .55;
+      }
     }
 
     function applyQuality() {
@@ -4088,8 +4059,9 @@
         ? Math.min(window.devicePixelRatio || 1, 1.5) : CONFIG.pixelRatio;
       renderer.setPixelRatio(ratio);
       renderer.setSize(innerWidth, innerHeight);
-      composer.setPixelRatio(ratio);
-      composer.setSize(innerWidth, innerHeight);
+      composer?.setPixelRatio(ratio);
+      composer?.setSize(innerWidth, innerHeight);
+      if (active && quality !== "low") requestPostprocessing();
       starGeo.setDrawRange(0, quality === "low" ? Math.floor(CONFIG.stars * .4) : CONFIG.stars);
       visibleParticleCount = quality === "low" ? Math.max(100, Math.floor(CONFIG.particles * .4)) : CONFIG.particles;
       particleGeo.setDrawRange(0, visibleParticleCount);
@@ -4108,7 +4080,7 @@
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
-      composer.setSize(innerWidth, innerHeight);
+      composer?.setSize(innerWidth, innerHeight);
     });
 
     renderer.domElement.addEventListener("webglcontextlost", event => {
@@ -4167,7 +4139,8 @@
 
       camera.updateMatrixWorld();
       updateHUD();
-      composer.render(dt);
+      if (composer && settings.quality.value !== "low") composer.render(dt);
+      else renderer.render(scene, camera);
     }
 
     requestAnimationFrame(frame);

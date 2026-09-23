@@ -2,11 +2,11 @@ import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 
 export default defineConfig({
-  root: 'web',
-  base: './',
+  root: '.',
+  base: '/',
   publicDir: false,
   build: {
-    outDir: '../dist-nebula3',
+    outDir: 'dist-nebula3',
     emptyOutDir: true,
     assetsInlineLimit: 0,
     rollupOptions: {

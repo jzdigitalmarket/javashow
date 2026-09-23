@@ -3,13 +3,16 @@ import type { Camera } from 'three';
 import laser from '../../audio/laser.mp3?url';
 import impact from '../../audio/impact.mp3?url';
 import explosion from '../../audio/explosion.mp3?url';
+import explosion2 from '../../audio/explosion2.mp3?url';
 import shield from '../../audio/shield.mp3?url';
 import alert from '../../audio/alert.mp3?url';
 
 export type SoundKind = 'shot' | 'hit' | 'blast' | 'bomb' | 'shield' | 'alert';
-type FileKind = Exclude<SoundKind, 'bomb'>;
+type FileKind = SoundKind;
 
-const files: Record<FileKind, string> = { shot: laser, hit: impact, blast: explosion, shield, alert };
+const files: Record<FileKind, string> = {
+  shot: laser, hit: impact, blast: explosion, bomb: explosion2, shield, alert
+};
 const volume: Record<SoundKind, number> = {
   shot: .32, hit: .4, blast: .7, bomb: .85, shield: .5, alert: .35
 };
@@ -83,7 +86,7 @@ export class CombatAudio {
     if (now - (this.last.get(kind) ?? -100) < interval) return;
     this.last.set(kind, now);
 
-    const buffer = this.buffers.get(kind === 'bomb' ? 'blast' : kind);
+    const buffer = this.buffers.get(kind);
     const gain = context.createGain();
     const panner = context.createStereoPanner?.();
     const listener = this.camera();
@@ -103,7 +106,7 @@ export class CombatAudio {
     if (buffer) {
       const player = context.createBufferSource();
       player.buffer = buffer;
-      player.playbackRate.value = (kind === 'bomb' ? .72 : 1) * (.94 + Math.random() * .12);
+      player.playbackRate.value = (kind === 'bomb' ? .8 : 1) * (.94 + Math.random() * .12);
       player.connect(gain);
       source = player;
       player.start(now);
