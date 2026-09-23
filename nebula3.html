@@ -869,6 +869,10 @@
           <span>Efeitos sonoros de combate</span>
         </label>
 
+        <label for="effectsVolume">Volume dos efeitos: <output id="effectsVolumeValue">60%</output></label>
+        <input id="effectsVolume" type="range" min="0" max="100" value="60" step="5" />
+        <button id="previewEffects" type="button">OUVIR EFEITOS</button>
+
         <label for="sensitivity">Sensibilidade da mira: <output id="sensitivityValue">100%</output></label>
         <input id="sensitivity" type="range" min="40" max="200" value="100" step="10" />
 
@@ -1059,13 +1063,17 @@
     try { preferences = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") || {}; } catch {}
     const settings = {
       effects: $("effectsEnabled"), sensitivity: $("sensitivity"),
-      difficulty: $("difficulty"), quality: $("quality"), best: $("bestScore")
+      difficulty: $("difficulty"), quality: $("quality"), best: $("bestScore"),
+      volume: $("effectsVolume"), preview: $("previewEffects")
     };
     const allowed = (value, values, fallback) => values.includes(value) ? value : fallback;
     settings.difficulty.value = allowed(preferences.difficulty, ["easy", "normal", "hard"], "normal");
     settings.quality.value = allowed(preferences.quality, ["low", "auto", "high"], "auto");
     settings.sensitivity.value = clamp(Number(preferences.sensitivity) || 100, 40, 200);
     settings.effects.checked = preferences.effects !== false;
+    settings.volume.value = Number.isFinite(preferences.effectsVolume)
+      ? clamp(preferences.effectsVolume, 0, 100) : 60;
+    $("effectsVolumeValue").textContent = `${settings.volume.value}%`;
     const bestScore = Number.isFinite(preferences.bestScore) ? Math.max(0, preferences.bestScore) : 0;
     let record = bestScore;
     settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
@@ -1075,55 +1083,123 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           difficulty: settings.difficulty.value, quality: settings.quality.value,
           sensitivity: Number(settings.sensitivity.value), effects: settings.effects.checked,
+          effectsVolume: Number(settings.volume.value),
           touch: $("touchEnabled").checked, music: $("musicEnabled").checked,
           track: $("musicSelect").value.startsWith("blob:") ? "" : $("musicSelect").value,
           bestScore: record
         }));
       } catch { /* Armazenamento indisponível: a partida continua. */ }
     }
-    for (const input of [settings.difficulty, settings.quality, settings.sensitivity, settings.effects]) {
+    for (const input of [settings.difficulty, settings.quality, settings.sensitivity, settings.effects, settings.volume]) {
       input.addEventListener("change", savePreferences);
     }
     settings.sensitivity.addEventListener("input", () => {
       $("sensitivityValue").textContent = `${settings.sensitivity.value}%`;
     });
+    settings.volume.addEventListener("input", () => {
+      $("effectsVolumeValue").textContent = `${settings.volume.value}%`;
+      if (effectsMaster) effectsMaster.gain.value = Number(settings.volume.value) / 100;
+    });
     let missionDifficulty = settings.difficulty.value;
     const difficultyScale = () => ({ easy: .7, normal: 1, hard: 1.4 })[missionDifficulty];
     const aimSensitivity = () => Number(settings.sensitivity.value) / 100;
 
-    let audioContext = null;
+    const effectFiles = {
+      shot: "audio/laser.mp3", hit: "audio/impact.mp3",
+      blast: "audio/explosion.mp3", shield: "audio/shield.mp3",
+      alert: "audio/alert.mp3"
+    };
+    const effectBuffers = new Map();
     const soundLast = new Map();
+    const audioRight = new V3();
+    const audioDirection = new V3();
+    let audioContext = null;
+    let effectsMaster = null;
+    let effectsLoading = null;
+    let activeEffects = 0;
+
     function wakeAudio() {
       if (!settings.effects.checked) return;
       try {
-        audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const limiter = audioContext.createDynamicsCompressor();
+          limiter.threshold.value = -16;
+          limiter.ratio.value = 3;
+          effectsMaster = audioContext.createGain();
+          effectsMaster.gain.value = Number(settings.volume.value) / 100;
+          effectsMaster.connect(limiter).connect(audioContext.destination);
+        }
         if (audioContext.state === "suspended") audioContext.resume().catch(() => {});
+        effectsLoading ||= Promise.allSettled(Object.entries(effectFiles).map(async ([kind, path]) => {
+          const response = await fetch(path);
+          if (!response.ok) throw new Error(`Áudio indisponível: ${path}`);
+          effectBuffers.set(kind, await audioContext.decodeAudioData(await response.arrayBuffer()));
+        }));
       } catch { settings.effects.checked = false; }
     }
-    function sound(kind) {
-      if (!audioContext || audioContext.state !== "running" || !settings.effects.checked) return;
+
+    function sound(kind, position = null) {
+      if (!audioContext || audioContext.state !== "running" ||
+          !settings.effects.checked || activeEffects >= 18) return;
       const now = audioContext.currentTime;
-      if (now - (soundLast.get(kind) ?? -100) < (kind === "shot" ? .1 : .18)) return;
+      const interval = kind === "shot" ? .11 : kind === "hit" ? .08 : .22;
+      if (now - (soundLast.get(kind) ?? -100) < interval) return;
       soundLast.set(kind, now);
-      const presets = {
-        shot: [520, 170, .09, .045, "sawtooth"],
-        hit: [130, 55, .16, .075, "square"],
-        blast: [110, 28, .65, .13, "sawtooth"],
-        alert: [430, 240, .32, .09, "triangle"]
-      };
-      const [start, end, duration, volume, wave] = presets[kind];
-      const oscillator = audioContext.createOscillator();
+
+      const buffer = effectBuffers.get(kind === "bomb" ? "blast" : kind);
+      const source = buffer ? audioContext.createBufferSource() : audioContext.createOscillator();
       const gain = audioContext.createGain();
-      oscillator.type = wave;
-      oscillator.frequency.setValueAtTime(start, now);
-      oscillator.frequency.exponentialRampToValueAtTime(end, now + duration);
-      gain.gain.setValueAtTime(volume, now);
-      gain.gain.exponentialRampToValueAtTime(.001, now + duration);
-      oscillator.connect(gain).connect(audioContext.destination);
-      oscillator.start(now);
-      oscillator.stop(now + duration);
-      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      const panner = audioContext.createStereoPanner?.();
+      const distance = position ? position.distanceTo(camera.position) : 0;
+      const attenuation = 1 / (1 + distance / 260);
+      const volumes = { shot: .32, hit: .40, blast: .70, bomb: .85, shield: .5, alert: .35 };
+      gain.gain.value = (volumes[kind] || .4) * attenuation;
+      if (panner) {
+        audioRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+        panner.pan.value = position
+          ? clamp(audioRight.dot(audioDirection.subVectors(position, camera.position)) / Math.max(distance, 1), -.85, .85)
+          : 0;
+        gain.connect(panner);
+        panner.connect(effectsMaster);
+      } else {
+        gain.connect(effectsMaster);
+      }
+
+      if (buffer) {
+        source.buffer = buffer;
+        source.playbackRate.value = (kind === "bomb" ? .72 : 1) * rand(.94, 1.06);
+        source.connect(gain);
+        source.start(now);
+      } else {
+        // O jogo ainda produz feedback se um arquivo não carregar.
+        const tones = { shot: [510, 180, .10], hit: [160, 55, .14],
+          blast: [105, 28, .5], bomb: [90, 22, .7],
+          shield: [330, 90, .2], alert: [460, 220, .3] };
+        const [start, end, duration] = tones[kind] || tones.hit;
+        source.type = kind === "alert" ? "triangle" : "sawtooth";
+        source.frequency.setValueAtTime(start, now);
+        source.frequency.exponentialRampToValueAtTime(end, now + duration);
+        gain.gain.setValueAtTime(Math.max(gain.gain.value, .0001), now);
+        gain.gain.exponentialRampToValueAtTime(.0001, now + duration);
+        source.connect(gain);
+        source.start(now);
+        source.stop(now + duration);
+      }
+      activeEffects++;
+      source.onended = () => {
+        source.disconnect(); gain.disconnect(); panner?.disconnect();
+        activeEffects--;
+      };
     }
+
+    settings.preview.addEventListener("click", async () => {
+      wakeAudio();
+      await effectsLoading;
+      sound("shot");
+      setTimeout(() => sound("hit"), 270);
+      setTimeout(() => sound("bomb"), 600);
+    });
 
     const ui = {
       overlay: $("overlay"), title: $("title"), description: $("description"),
@@ -1982,6 +2058,7 @@
 
     function destroyAsteroid(asteroid, award = true) {
       destroyedWorldObjects.add(asteroid.id);
+      sound("blast", asteroid.mesh.position);
       burst(asteroid.mesh.position, 0xffa45c, 55, 34);
       burst(asteroid.mesh.position, 0x7d8ca8, 35, 18);
       scene.remove(asteroid.mesh);
@@ -2267,7 +2344,7 @@
     function destroyStation(entry) {
       if (!entry || entry.destroyed) return;
       entry.destroyed = true;
-      sound("blast");
+      sound("bomb", entry.group.position);
       affectCivilization({ economy: -3, trade: -5, stability: -7 },
         "AURORA // PERDA DE ESTAÇÃO AFETA ABASTECIMENTO E COMÉRCIO");
       const center = entry.group.position.clone();
@@ -2800,7 +2877,7 @@
     function detonateBomb(index) {
       const bomb = bombs[index];
       if (!bomb) return;
-      sound("blast");
+      sound("bomb", bomb.mesh.position);
       const center = bomb.mesh.position.clone();
       const radius = 240;
       const radiusSq = radius * radius;
@@ -2978,6 +3055,7 @@
             camera.position, bullet.previous, bullet.mesh.position
           ) < 9) {
             shield = Math.max(0, shield - bullet.damage);
+            sound("shield");
             sinceDamage = 0;
             damage = 1;
             hit = true;
@@ -3002,6 +3080,7 @@
               burst(bullet.mesh.position, 0xffb45c, 15, 14);
 
               if (drone.hp <= 0) {
+                sound("blast", drone.group.position);
                 burst(drone.group.position, 0xff5c39, 100, 45);
                 burst(drone.group.position, 0x48eaff, 55, 28);
                 drone.group.visible = false;
@@ -3066,7 +3145,7 @@
         }
 
         if (hit || bullet.life <= 0) removeBullet(i);
-        if (hit) sound("hit");
+        if (hit) sound("hit", bullet.mesh.position);
       }
     }
 
@@ -4185,6 +4264,7 @@
 
     function destroyAlly(ally) {
       if (!ally.active) return;
+      sound("blast", ally.group.position);
       burst(ally.group.position, 0x59ffc0, 95, 48);
       burst(ally.group.position, 0xffa451, 70, 38);
       ally.active = false;
@@ -4285,7 +4365,7 @@
       boss.respawn = rand(70, 105) / difficultyScale();
       score += 3000;
       affectCivilization({ stability: 5, economy: 2 }, "AURORA // VITÓRIA ELEVA A CONFIANÇA DA COLÔNIA");
-      sound("blast");
+      sound("bomb", boss.group.position);
       queueEvent("COMANDO // NAVE-CHEFÃ DESTRUÍDA · +3000 PTS", "ally");
     }
 
@@ -4353,7 +4433,7 @@
       mothership.respawn = rand(120, 165) / difficultyScale();
       score += 8000;
       affectCivilization({ stability: 12, economy: 4, trade: 5 }, "AURORA // NAVE-MÃE DESTRUÍDA · ROTAS COMERCIAIS REABERTAS");
-      sound("blast");
+      sound("bomb", mothership.group.position);
       queueEvent("COMANDO // NAVE-MÃE DESTRUÍDA · +8000 PTS", "ally");
     }
 
