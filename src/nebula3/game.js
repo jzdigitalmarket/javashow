@@ -359,7 +359,7 @@
             vec3 color = mix(ocean, ground, continents) * (.06 + light * 1.3);
 
             float clouds = smoothstep(.57, .74, fbm(vLocal * 13. + 15.));
-            color = mix(color, vec3(.62, .8, .9) * (.1 + light), clouds * .75);
+            color = mix(color, vec3(.62, .8, .9) * (.1 + light), clouds * .25);
 
             float cityThreshold = mix(.72, .57, civilizationLevel);
             float cities = pow(max(0., noise3(vLocal * 210.) - cityThreshold) * 3., 3.5);
@@ -377,6 +377,39 @@
 
     planet.position.set(-1050, 270, -2300);
     scene.add(planet);
+
+    // Nuvens orbitam de forma independente da superfície e recortam o terminador.
+    const cloudShell = new THREE.Mesh(
+      new THREE.SphereGeometry(577, 64, 48),
+      new THREE.ShaderMaterial({
+        uniforms: { time: { value: 0 } },
+        transparent: true,
+        depthWrite: false,
+        vertexShader: `
+          varying vec3 vNormal, vLocal;
+          void main() {
+            vNormal = normalize(mat3(modelMatrix) * normal);
+            vLocal = normalize(position);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
+          }
+        `,
+        fragmentShader: `
+          uniform float time;
+          varying vec3 vNormal, vLocal;
+          ${noiseGLSL}
+          void main() {
+            vec3 p = vLocal * 13. + vec3(time * .025, 15., 0.);
+            float cover = fbm(p) * .75 + fbm(p * 2.1) * .25;
+            float alpha = smoothstep(.52, .66, cover) * .78;
+            float light = max(dot(normalize(vNormal), normalize(vec3(.8, .4, .7))), 0.);
+            vec3 color = mix(vec3(.08, .16, .24), vec3(.77, .88, .95), light);
+            gl_FragColor = vec4(color, alpha * (.28 + .72 * light));
+          }
+        `
+      })
+    );
+    cloudShell.rotation.y = .25;
+    planet.add(cloudShell);
 
     const atmosphere = new THREE.Mesh(
       new THREE.SphereGeometry(593, 64, 48),
@@ -576,6 +609,34 @@
 
     const stationRings = [];
 
+    // Docas e balizas identificam a estação mesmo à distância.
+    const stationDetails = new THREE.Group();
+    station.add(stationDetails);
+    const dockingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x426579, metalness: .75, roughness: .35
+    });
+    const beaconMaterial = new THREE.MeshBasicMaterial({ color: 0xffa052 });
+    const dockingGeo = new THREE.CylinderGeometry(5, 8, 3, 8);
+    const beaconGeo = new THREE.SphereGeometry(1.7, 8, 6);
+    const dockInstances = new THREE.InstancedMesh(dockingGeo, dockingMaterial, 12);
+    const beaconInstances = new THREE.InstancedMesh(beaconGeo, beaconMaterial, 12);
+    const dockTransform = new THREE.Object3D();
+    for (let i = 0; i < 12; i++) {
+      const angle = i * Math.PI / 6;
+      const radius = 105;
+      dockTransform.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
+      dockTransform.rotation.set(0, 0, angle - Math.PI / 2);
+      dockTransform.updateMatrix();
+      dockInstances.setMatrixAt(i, dockTransform.matrix);
+      dockTransform.position.set(Math.cos(angle) * (radius + 9), Math.sin(angle) * (radius + 9), 0);
+      dockTransform.rotation.set(0, 0, 0);
+      dockTransform.updateMatrix();
+      beaconInstances.setMatrixAt(i, dockTransform.matrix);
+    }
+    dockInstances.instanceMatrix.needsUpdate = true;
+    beaconInstances.instanceMatrix.needsUpdate = true;
+    stationDetails.add(dockInstances, beaconInstances);
+
     for (let i = 0; i < 3; i++) {
       const pivot = new THREE.Group();
       pivot.rotation.set(i * .52, i * .35, 0);
@@ -615,6 +676,42 @@
       for (let j = 0; j < 4; j++) {
         mesh(boxGeo, armor, arm, [25 + j * 8, 10, 0], [6, 16, .7]);
         mesh(boxGeo, purple, arm, [25 + j * 8, 10, .5], [.25, 14, .15]);
+      }
+    }
+
+    // Ondas luminosas curtas tornam os impactos grandes legíveis em movimento.
+    const impactGeo = new THREE.RingGeometry(.84, 1, 48);
+    const impacts = [];
+    function clearImpact(impact) {
+      scene.remove(impact.ring);
+      impact.ring.material.dispose();
+      if (impact.light) scene.remove(impact.light);
+    }
+    function spawnImpact(position, radius, color) {
+      if (impacts.length >= 8) clearImpact(impacts.shift());
+      const material = new THREE.MeshBasicMaterial({
+        color, side: THREE.DoubleSide, transparent: true, opacity: .8,
+        depthWrite: false, blending: THREE.AdditiveBlending
+      });
+      const ring = new THREE.Mesh(impactGeo, material);
+      ring.position.copy(position);
+      ring.scale.setScalar(2);
+      scene.add(ring);
+      const light = settings.quality.value === "high"
+        ? new THREE.PointLight(color, 7, Math.min(radius * 2, 450), 2) : null;
+      if (light) { light.position.copy(position); scene.add(light); }
+      impacts.push({ ring, light, radius, life: 0, duration: .85 });
+    }
+    function updateImpacts(dt) {
+      for (let i = impacts.length - 1; i >= 0; i--) {
+        const impact = impacts[i];
+        impact.life += dt;
+        const progress = Math.min(impact.life / impact.duration, 1);
+        impact.ring.scale.setScalar(2 + impact.radius * progress);
+        impact.ring.quaternion.copy(camera.quaternion);
+        impact.ring.material.opacity = .8 * (1 - progress) ** 2;
+        if (impact.light) impact.light.intensity = 7 * (1 - progress) ** 2;
+        if (progress === 1) { clearImpact(impact); impacts.splice(i, 1); }
       }
     }
 
@@ -966,6 +1063,10 @@
         for (const shock of explosion.shocks) shock.mesh.position.sub(shift);
         for (const fragment of explosion.debris) fragment.mesh.position.sub(shift);
       }
+      for (const impact of impacts) {
+        impact.ring.position.sub(shift);
+        if (impact.light) impact.light.position.sub(shift);
+      }
 
       for (let i = 0; i < CONFIG.particles; i++) {
         if (particleLives[i] <= 0) continue;
@@ -1216,6 +1317,7 @@
       affectCivilization({ economy: -3, trade: -5, stability: -7 },
         "AURORA // PERDA DE ESTAÇÃO AFETA ABASTECIMENTO E COMÉRCIO");
       const center = entry.group.position.clone();
+      spawnImpact(center, 170, 0xffa458);
 
       burst(center, 0xff542f, 250, 125);
       burst(center, 0xffc34d, 210, 92);
@@ -1760,6 +1862,7 @@
 
       burst(center, 0xffc85c, 220, 105);
       burst(center, 0x57e7ff, 160, 80);
+      spawnImpact(center, radius, 0x7be8ff);
 
       for (let i = worldAsteroids.length - 1; i >= 0; i--) {
         const asteroid = worldAsteroids[i];
@@ -2687,6 +2790,7 @@
         bombs.pop();
       }
       while (stationExplosions.length) disposeStationExplosion(stationExplosions.pop());
+      while (impacts.length) clearImpact(impacts.pop());
 
       for (const key of Array.from(loadedSectors.keys())) unloadSector(key);
       destroyedWorldObjects.clear();
@@ -3216,6 +3320,7 @@
 
     function destroyBoss() {
       if (!boss.visible) return;
+      spawnImpact(boss.group.position, 175, 0xff627d);
       burst(boss.group.position, 0xff3f62, 260, 110);
       burst(boss.group.position, 0xb64dff, 190, 85);
       boss.visible = false;
@@ -3283,6 +3388,7 @@
 
     function destroyMothership() {
       if (!mothership.visible) return;
+      spawnImpact(mothership.group.position, 265, 0xe18bff);
       burst(mothership.group.position, 0xff315f, 360, 145);
       burst(mothership.group.position, 0xb847ff, 320, 120);
       burst(mothership.group.position, 0x55ddff, 240, 90);
@@ -3591,11 +3697,14 @@
       sky.material.uniforms.time.value = time;
 
       planet.rotation.y += dt * .015;
+      cloudShell.rotation.y += dt * .007;
+      cloudShell.material.uniforms.time.value = time;
 
       stationRings.forEach((ring, i) => {
         ring.rotation.z += dt * (i % 2 ? -.16 : .12);
       });
       station.rotation.y += dt * .025;
+      beaconMaterial.color.setHex(Math.sin(time * 3.5) > 0 ? 0xffa052 : 0x573a30);
 
       const speedFactor = clamp(velocity.length() / CONFIG.boostSpeed, 0, 1);
       streakMaterial.opacity = speedFactor * .15 + warpVisual * .65;
@@ -3637,6 +3746,13 @@
       starGeo.setDrawRange(0, quality === "low" ? Math.floor(CONFIG.stars * .4) : CONFIG.stars);
       visibleParticleCount = quality === "low" ? Math.max(100, Math.floor(CONFIG.particles * .4)) : CONFIG.particles;
       particleGeo.setDrawRange(0, visibleParticleCount);
+      cloudShell.visible = quality !== "low";
+      stationDetails.visible = quality !== "low";
+      if (quality !== "high") {
+        for (const impact of impacts) {
+          if (impact.light) { scene.remove(impact.light); impact.light = null; }
+        }
+      }
     }
     settings.quality.addEventListener("change", applyQuality);
 
@@ -3689,6 +3805,7 @@
         updateBombs(dt);
         updateParticles(dt);
         updateStationExplosions(dt);
+        updateImpacts(dt);
         updateEnvironment(dt);
         updateCivilization(dt);
         updateMissionEvents(dt);
