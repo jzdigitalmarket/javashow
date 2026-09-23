@@ -1459,6 +1459,7 @@
     // ============================================================
 
     const drones = [];
+    let lastSupersonicAlert = -100;
 
     const interceptorHull = new THREE.ConeGeometry(1, 3.8, 3);
     const fortressHull = new THREE.OctahedronGeometry(1, 0);
@@ -1468,10 +1469,21 @@
     const fortressArmor = new THREE.MeshStandardMaterial({
       color: 0x584575, metalness: .82, roughness: .46
     });
+    const sonicArmor = new THREE.MeshStandardMaterial({
+      color: 0x779ba5, metalness: .76, roughness: .31
+    });
+    const sonicTrail = new THREE.MeshBasicMaterial({
+      color: 0xffb46d, transparent: true, opacity: .28, depthWrite: false
+    });
+    const sonicCore = new THREE.MeshStandardMaterial({
+      color: 0xffcd83, emissive: 0xc65b20, emissiveIntensity: .6,
+      metalness: .45, roughness: .3
+    });
 
     function createDrone(index) {
       const group = new THREE.Group();
-      const kind = index % 3;
+      // Duas supersônicas entre os doze inimigos, mantendo o mesmo limite total.
+      const kind = [0, 1, 2, 1, 0, 1, 2, 3, 0, 1, 2, 3][index % 12];
       const arms = [];
       let core, engine;
 
@@ -1504,7 +1516,7 @@
         }
         core = mesh(ballGeo, pink, group, [0, .38, 1.8], [.65, .35, .85]);
         engine = mesh(ringGeo, pink, group, [0, 0, -3], [1.1, 1.1, 1.1]);
-      } else {
+      } else if (kind === 2) {
         // Fortaleza: casco octogonal largo, placas e duas baterias laterais.
         mesh(fortressHull, fortressArmor, group, [0, 0, 0], [5.4, 2.9, 4]);
         mesh(boxGeo, darkMetal, group, [0, .9, 0], [6, .6, 2]);
@@ -1515,14 +1527,28 @@
         }
         core = mesh(ballGeo, purple, group, [0, .8, 2.5], [1.1, .65, .6]);
         engine = mesh(ringGeo, purple, group, [0, 0, -3.9], [1.9, 1.9, 1.9]);
+      } else {
+        // Supersônica: casco estreito, asas enflechadas e rastro leve.
+        const hull = mesh(interceptorHull, sonicArmor, group, [0, 0, 0], [1.9, 5.5, 1.3]);
+        hull.rotation.x = Math.PI / 2;
+        for (const side of [-1, 1]) {
+          const wing = mesh(boxGeo, sonicArmor, group,
+            [side * 2.4, -.15, -1.1], [3.5, .15, 1.7]);
+          wing.rotation.y = side * .36;
+          mesh(boxGeo, darkMetal, group, [side * 1.15, .45, -3.1], [.35, 1.4, 2.5]);
+        }
+        core = mesh(ballGeo, sonicCore, group, [0, .35, 3.1], [.42, .32, .7]);
+        engine = mesh(ringGeo, pink, group, [0, 0, -4.1], [1.05, 1.05, 1.05]);
+        mesh(boxGeo, sonicTrail, group, [0, 0, -10.8], [.3, .3, 12]);
       }
       scene.add(group);
 
       return {
         group, arms, core, engine, coreScale: core.scale.clone(), kind,
-        maxHp: [3, 2, 7][kind],
-        hp: [3, 2, 7][kind], phase: rand(0, Math.PI * 2),
-        cooldown: rand(1.2, 3.8), respawn: 0
+        maxHp: [3, 2, 7, 3][kind],
+        hp: [3, 2, 7, 3][kind], phase: rand(0, Math.PI * 2),
+        cooldown: rand(1.2, 3.8), respawn: 0,
+        velocity: new V3(), evade: new V3(), evadeTimer: 0, evadeCooldown: 0
       };
     }
 
@@ -1539,6 +1565,13 @@
       drone.hp = drone.maxHp;
       drone.cooldown = rand(1.5, 4);
       drone.respawn = 0;
+      drone.velocity.set(0, 0, 0);
+      drone.evadeTimer = 0;
+      drone.evadeCooldown = rand(.25, .8);
+      if (!initial && drone.kind === 3 && active && time - lastSupersonicAlert > 24) {
+        queueEvent("SENSORES // NAVE SUPERSÔNICA EM APROXIMAÇÃO", "alert");
+        lastSupersonicAlert = time;
+      }
     }
 
     for (let i = 0; i < CONFIG.drones; i++) drones.push(createDrone(i));
@@ -1885,7 +1918,8 @@
       if (includeShips) {
         for (const drone of drones) {
           if (drone.group.visible) add(drone.group.position,
-            drone.kind === 2 ? 7 : 5, drone.group.uuid, "enemy");
+            drone.kind === 2 ? 7 : drone.kind === 3 ? 6 : 5,
+            drone.group.uuid, "enemy");
         }
         for (const ally of allies) {
           if (ally.active) add(ally.group.position, ally.radius, ally.group.uuid, "ally");
@@ -1942,6 +1976,13 @@
     }
     let defenseCooldown = 1.4;
     let defenseVolley = 0;
+    let lastDefenseTier = 2;
+
+    function defenseTier() {
+      return civilization.stability < 20 ? 0 :
+        civilization.stability < 50 ? 1 :
+          civilization.stability < 80 ? 2 : 3;
+    }
 
     function clearDefenseBeam(beam) {
       scene.remove(beam.mesh);
@@ -1960,7 +2001,18 @@
         }
       }
 
-      if (!mothership.visible ||
+      const tier = defenseTier();
+      if (tier !== lastDefenseTier) {
+        queueEvent(tier === 0
+          ? "AURORA // REDE DE DEFESA DESATIVADA: ESTABILIDADE CRÍTICA"
+          : tier === 1
+            ? "AURORA // BATERIAS OPERANDO COM ENERGIA LIMITADA"
+            : "AURORA // DEFESAS PLANETÁRIAS RESTABELECIDAS",
+          tier < 2 ? "alert" : "ally");
+        lastDefenseTier = tier;
+      }
+
+      if (tier === 0 || !mothership.visible ||
         mothership.group.position.distanceToSquared(planet.position) > 2750 ** 2) return;
       defenseCooldown -= dt;
       if (defenseCooldown > 0) return;
@@ -1986,12 +2038,12 @@
       scene.add(beamMesh);
       defenseBeams.push({ mesh: beamMesh, life: .26 });
       burst(mothership.group.position, 0x6de8ff, 22, 14);
-      mothership.hp -= 3;
+      mothership.hp -= tier === 1 ? 2 : tier === 2 ? 3 : 4;
       if (mothership.hp <= 0) destroyMothership();
       if (defenseVolley++ === 0) {
         queueEvent("AURORA // BATERIAS PLANETÁRIAS DISPARAM CONTRA A NAVE-MÃE", "ally");
       }
-      defenseCooldown = 1.15;
+      defenseCooldown = tier === 1 ? 2.2 : tier === 2 ? 1.15 : .9;
     }
 
     // ============================================================
@@ -3076,7 +3128,8 @@
     }
 
     function play() {
-      if (dead || !started) reset();
+      const newMission = dead || !started;
+      if (newMission) reset();
       if (!shipVisualsRequested) {
         shipVisualsRequested = true;
         void upgradeShipVisuals(shipExterior, allies);
@@ -3088,6 +3141,7 @@
 
       started = true;
       active = true;
+      if (newMission) queueEvent("SENSORES // BATEDORES E NAVES SUPERSÔNICAS DETECTADOS", "alert");
       if (settings.quality.value !== "low") requestPostprocessing();
 
       ui.overlay.style.display = "none";
@@ -3207,6 +3261,8 @@
       solidImpactTimes.clear();
       defenseCooldown = 1.4;
       defenseVolley = 0;
+      lastDefenseTier = 2;
+      lastSupersonicAlert = -100;
 
       for (const key of Array.from(loadedSectors.keys())) unloadSector(key);
       destroyedWorldObjects.clear();
@@ -3549,9 +3605,9 @@
       }
     }
 
-    function chooseEnemyTarget(origin) {
+    function chooseEnemyTarget(origin, preferAllies = false) {
       const availableAllies = allies.filter(ally => ally.active);
-      if (availableAllies.length && Math.random() < .48) {
+      if (availableAllies.length && Math.random() < (preferAllies ? .85 : .48)) {
         const ally = availableAllies[Math.floor(Math.random() * availableAllies.length)];
         return { position: ally.group.position, velocity: ally.velocity, type: "ally" };
       }
@@ -3568,6 +3624,23 @@
       return { position: camera.position, velocity, type: "player" };
     }
 
+    function incomingShot(drone) {
+      const position = drone.group.position;
+      const safeRadius = drone.kind === 3 ? 90 : drone.kind === 1 ? 68 : 48;
+      for (const bullet of bullets) {
+        if (bullet.enemy) continue;
+        const toward = temp.subVectors(position, bullet.mesh.position);
+        const speedSq = bullet.velocity.lengthSq();
+        const projection = toward.dot(bullet.velocity);
+        if (projection <= 0 || speedSq < 1) continue;
+        const seconds = Math.min(.55, projection / speedSq);
+        if (seconds < .04) continue;
+        const miss = bullet.mesh.position.clone().addScaledVector(bullet.velocity, seconds);
+        if (miss.distanceToSquared(position) < safeRadius * safeRadius) return bullet;
+      }
+      return null;
+    }
+
     function updateDrones(dt) {
       for (const drone of drones) {
         if (!drone.group.visible) {
@@ -3578,25 +3651,57 @@
 
         const p = drone.group.position;
         const previous = p.clone();
-        temp.subVectors(camera.position, p);
-        const distance = temp.length();
+        const distance = p.distanceTo(camera.position);
 
         if (distance > 950 && warpTimer === 0) {
           placeDrone(drone);
           continue;
         }
 
-        temp.normalize();
+        const escortTarget = drone.kind === 1
+          ? allies.find(ally => ally.active &&
+            ally.group.position.distanceToSquared(p) < 480 ** 2)
+          : null;
+        const targetPosition = escortTarget?.group.position || camera.position;
+        const toward = new V3().subVectors(targetPosition, p);
+        const targetDistance = toward.length();
+        toward.normalize();
+        const chaseSpeed = [38, 68, 23, 170][drone.kind];
+        const approach = targetDistance > (drone.kind === 3 ? 155 : 115)
+          ? chaseSpeed : targetDistance < 55 ? -chaseSpeed * .4 : 0;
+        const desired = toward.clone().multiplyScalar(approach);
+        const lateral = new V3().crossVectors(toward, UP_AXIS).normalize();
+        desired.addScaledVector(lateral,
+          Math.sin(time * (drone.kind === 3 ? 3.1 : 1.4) + drone.phase) *
+          [17, 34, 9, 85][drone.kind]);
+        desired.y += Math.cos(time * 1.8 + drone.phase) * (drone.kind === 3 ? 22 : 8);
 
-        const approach = distance > 115 ? [22, 37, 13][drone.kind] :
-          distance < 48 ? -18 : 0;
-        p.addScaledVector(temp, approach * dt);
-
-        p.x += Math.cos(time * .65 + drone.phase) * dt * 7;
-        p.y += Math.sin(time * .9 + drone.phase) * dt * 5;
+        drone.evadeTimer = Math.max(0, drone.evadeTimer - dt);
+        drone.evadeCooldown = Math.max(0, drone.evadeCooldown - dt);
+        if (drone.evadeCooldown <= 0 && drone.evadeTimer <= 0) {
+          const threat = incomingShot(drone);
+          if (threat) {
+            drone.evade.crossVectors(threat.velocity, UP_AXIS).normalize();
+            if (drone.evade.lengthSq() < .1) drone.evade.set(1, 0, 0);
+            const away = new V3().subVectors(p, threat.mesh.position);
+            if (drone.evade.dot(away) < 0) drone.evade.negate();
+            drone.evade.y = Math.sin(drone.phase + time) * .32;
+            drone.evade.normalize();
+            drone.evadeTimer = drone.kind === 3 ? .65 : .48;
+            drone.evadeCooldown = drone.kind === 2 ? 2 : rand(.7, 1.3);
+          }
+        }
+        if (drone.evadeTimer > 0) desired.addScaledVector(drone.evade,
+          drone.kind === 3 ? 190 : drone.kind === 1 ? 100 : 54);
+        drone.velocity.lerp(desired,
+          1 - Math.exp(-[2.6, 4.2, 1.8, 5.5][drone.kind] * dt));
+        drone.velocity.clampLength(0, drone.kind === 3 ? 205 : chaseSpeed * 1.7);
+        p.addScaledVector(drone.velocity, dt);
         keepActorOutOfWorld(drone.group, previous, drone.kind === 2 ? 7 : 5);
 
-        drone.group.lookAt(camera.position);
+        drone.group.lookAt(targetPosition);
+        drone.group.rotation.z += Math.sin(time * 5 + drone.phase) *
+          (drone.kind === 3 ? .18 : .06);
         drone.arms.forEach((arm, i) => {
           arm.rotation.z = Math.sin(time * 2.2 + drone.phase + i) * .18;
         });
@@ -3607,8 +3712,8 @@
 
         drone.cooldown -= dt;
 
-        if (drone.cooldown <= 0 && distance < 330 && warpTimer === 0) {
-          const target = chooseEnemyTarget(p);
+        if (drone.cooldown <= 0 && distance < 380 && warpTimer === 0) {
+          const target = chooseEnemyTarget(p, drone.kind === 1);
           drone.group.lookAt(target.position);
           const attackDirection = new V3().subVectors(target.position, p).normalize();
           const origin = p.clone().addScaledVector(attackDirection, 4);
@@ -3617,9 +3722,9 @@
             .add(new V3(rand(-3, 3), rand(-3, 3), rand(-3, 3)));
 
           spawnBullet(origin, aim.sub(origin).normalize(), true,
-            "drone", drone.kind === 2 ? 10 : drone.kind === 1 ? 6 : 9);
+            "drone", [9, 6, 10, 7][drone.kind]);
           drone.cooldown = rand(1.9, 3.6) / difficultyScale() *
-            [1, .7, 1.25][drone.kind];
+            [1, .7, 1.25, 1.25][drone.kind];
         }
       }
     }
@@ -4067,9 +4172,10 @@
           y *= 108 / length;
         }
 
-        radar.fillStyle = radarVector.y > 10 ? "#ffa763" : "#ff4976";
+        radar.fillStyle = drone.kind === 3 ? "#ffbd69" :
+          radarVector.y > 10 ? "#ffa763" : "#ff4976";
         radar.beginPath();
-        radar.arc(120 + x, 120 + y, 3, 0, Math.PI * 2);
+        radar.arc(120 + x, 120 + y, drone.kind === 3 ? 5 : 3, 0, Math.PI * 2);
         radar.fill();
 
         if (radarVector.z < 0) {
@@ -4082,7 +4188,7 @@
               x: (projected.x * .5 + .5) * innerWidth,
               y: (-projected.y * .5 + .5) * innerHeight,
               distance: camera.position.distanceTo(drone.group.position),
-              label: ["SENTINELA", "INTERCEPTOR", "FORTALEZA"][drone.kind]
+              label: ["SENTINELA", "BATEDOR", "FORTALEZA", "SUPERSÔNICA"][drone.kind]
             };
           }
         }
