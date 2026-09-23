@@ -1067,6 +1067,7 @@
         impact.ring.position.sub(shift);
         if (impact.light) impact.light.position.sub(shift);
       }
+      for (const beam of defenseBeams) beam.mesh.position.sub(shift);
 
       for (let i = 0; i < CONFIG.particles; i++) {
         if (particleLives[i] <= 0) continue;
@@ -1423,38 +1424,68 @@
 
     const drones = [];
 
-    function createDrone() {
+    const interceptorHull = new THREE.ConeGeometry(1, 3.8, 3);
+    const fortressHull = new THREE.OctahedronGeometry(1, 0);
+    const interceptorArmor = new THREE.MeshStandardMaterial({
+      color: 0x8b3147, metalness: .76, roughness: .34
+    });
+    const fortressArmor = new THREE.MeshStandardMaterial({
+      color: 0x584575, metalness: .82, roughness: .46
+    });
+
+    function createDrone(index) {
       const group = new THREE.Group();
-
-      mesh(boxGeo, metal, group, [0, 0, 0], [3.7, 3.5, 2.4]);
-      mesh(ballGeo, armor, group, [0, 2.4, .25], [1.8, 1.25, 1.3]);
-      mesh(boxGeo, pink, group, [0, 2.45, 1.48], [2.6, .28, .18]);
-
-      const core = mesh(ballGeo, pink, group, [0, 0, 1.5], [.75, .75, .5]);
-
+      const kind = index % 3;
       const arms = [];
+      let core, engine;
 
-      for (const side of [-1, 1]) {
-        const arm = new THREE.Group();
-        arm.position.set(side * 2.5, .7, 0);
-        group.add(arm);
-        arms.push(arm);
-
-        mesh(ballGeo, armor, arm, [0, 0, 0], [.7, .7, .7]);
-        mesh(boxGeo, metal, arm, [side * .6, -1.2, 0], [.85, 2.4, 1]);
-        mesh(boxGeo, darkMetal, arm, [side * .6, -2.1, 1.3], [1, 1, 3.8]);
-        mesh(ballGeo, pink, arm, [side * .6, -2.1, 3.25], [.35, .35, .2]);
-
-        mesh(boxGeo, armor, group, [side * 1.2, -2.8, 0], [.9, 2.2, 1]);
-        mesh(ballGeo, cyan, group, [side * 1.2, -4, -.1], [.45, .85, .45]);
+      if (kind === 0) {
+        mesh(boxGeo, metal, group, [0, 0, 0], [3.7, 3.5, 2.4]);
+        mesh(ballGeo, armor, group, [0, 2.4, .25], [1.8, 1.25, 1.3]);
+        mesh(boxGeo, pink, group, [0, 2.45, 1.48], [2.6, .28, .18]);
+        core = mesh(ballGeo, pink, group, [0, 0, 1.5], [.75, .75, .5]);
+        for (const side of [-1, 1]) {
+          const arm = new THREE.Group();
+          arm.position.set(side * 2.5, .7, 0);
+          group.add(arm);
+          arms.push(arm);
+          mesh(ballGeo, armor, arm, [0, 0, 0], [.7, .7, .7]);
+          mesh(boxGeo, metal, arm, [side * .6, -1.2, 0], [.85, 2.4, 1]);
+          mesh(boxGeo, darkMetal, arm, [side * .6, -2.1, 1.3], [1, 1, 3.8]);
+          mesh(ballGeo, pink, arm, [side * .6, -2.1, 3.25], [.35, .35, .2]);
+          mesh(boxGeo, armor, group, [side * 1.2, -2.8, 0], [.9, 2.2, 1]);
+        }
+        engine = mesh(ringGeo, cyan, group, [0, 0, -1.7], [1.3, 1.3, 1.3]);
+      } else if (kind === 1) {
+        // Interceptor: fuselagem triangular comprida e asas inclinadas.
+        const nose = mesh(interceptorHull, interceptorArmor, group, [0, 0, 0], [2.8, 2.4, 1]);
+        nose.rotation.x = Math.PI / 2;
+        for (const side of [-1, 1]) {
+          const wing = mesh(interceptorHull, metal, group, [side * 2.4, -.2, -1.2],
+            [1.9, .65, 1.15]);
+          wing.rotation.set(Math.PI / 2, 0, side * .22);
+          mesh(boxGeo, darkMetal, group, [side * 2.5, -.5, -2.5], [.45, .5, 2.3]);
+        }
+        core = mesh(ballGeo, pink, group, [0, .38, 1.8], [.65, .35, .85]);
+        engine = mesh(ringGeo, pink, group, [0, 0, -3], [1.1, 1.1, 1.1]);
+      } else {
+        // Fortaleza: casco octogonal largo, placas e duas baterias laterais.
+        mesh(fortressHull, fortressArmor, group, [0, 0, 0], [5.4, 2.9, 4]);
+        mesh(boxGeo, darkMetal, group, [0, .9, 0], [6, .6, 2]);
+        for (const side of [-1, 1]) {
+          mesh(boxGeo, metal, group, [side * 4.3, -.45, .25], [1.4, 1.3, 4.5]);
+          mesh(boxGeo, fortressArmor, group, [side * 4.4, .8, 0], [1.7, .6, 3]);
+          mesh(ballGeo, pink, group, [side * 4.3, -.4, 2.6], [.45, .45, .55]);
+        }
+        core = mesh(ballGeo, purple, group, [0, .8, 2.5], [1.1, .65, .6]);
+        engine = mesh(ringGeo, purple, group, [0, 0, -3.9], [1.9, 1.9, 1.9]);
       }
-
-      const engine = mesh(ringGeo, cyan, group, [0, 0, -1.7], [1.3, 1.3, 1.3]);
       scene.add(group);
 
       return {
-        group, arms, core, engine,
-        hp: 3, phase: rand(0, Math.PI * 2),
+        group, arms, core, engine, coreScale: core.scale.clone(), kind,
+        maxHp: [3, 2, 7][kind],
+        hp: [3, 2, 7][kind], phase: rand(0, Math.PI * 2),
         cooldown: rand(1.2, 3.8), respawn: 0
       };
     }
@@ -1469,12 +1500,12 @@
       local.applyQuaternion(camera.quaternion).add(camera.position);
       drone.group.position.copy(local);
       drone.group.visible = true;
-      drone.hp = 3;
+      drone.hp = drone.maxHp;
       drone.cooldown = rand(1.5, 4);
       drone.respawn = 0;
     }
 
-    for (let i = 0; i < CONFIG.drones; i++) drones.push(createDrone());
+    for (let i = 0; i < CONFIG.drones; i++) drones.push(createDrone(i));
 
     // ============================================================
     // ESQUADRÃO ALIADO E NAVE-CHEFÃ
@@ -1519,6 +1550,7 @@
       return {
         group,
         legacyHull,
+        beacon,
         index,
         active: false,
         cooldown: rand(.25, .8),
@@ -1532,7 +1564,7 @@
 
     const allies = Array.from({ length: CONFIG.allies }, (_, i) => createAlly(i));
     void upgradeShipVisuals(shipExterior, allies);
-    let allySpawnTimer = rand(24, 38);
+    let allySpawnTimer = rand(9, 15);
 
     function createBoss() {
       const group = new THREE.Group();
@@ -1592,11 +1624,23 @@
 
     function createMothership() {
       const group = new THREE.Group();
-      group.scale.setScalar(4.5);
+      group.scale.setScalar(13);
 
       mesh(motherDiskGeo, motherArmor, group, [0, 0, 0], [1, 1, 1]);
       mesh(ballGeo, darkMetal, group, [0, 1.25, 0], [3.2, 1.3, 3.2]);
       const core = mesh(ballGeo, purple, group, [0, -1.05, 0], [1.5, .65, 1.5]);
+      const upperDeck = mesh(new THREE.CylinderGeometry(2, 3.5, 1.7, 8),
+        motherArmor, group, [0, 2.55, 0]);
+      upperDeck.rotation.y = Math.PI / 8;
+      for (let i = 0; i < 6; i++) {
+        const angle = i / 6 * Math.PI * 2;
+        const spine = mesh(boxGeo, armor, group,
+          [Math.cos(angle) * 3.4, 2.1, Math.sin(angle) * 3.4], [.65, 1.8, .9]);
+        spine.rotation.y = -angle;
+        const strut = mesh(boxGeo, motherArmor, group,
+          [Math.cos(angle) * 6.4, -.45, Math.sin(angle) * 6.4], [2.8, .75, .8]);
+        strut.rotation.y = -angle;
+      }
 
       const commandRing = mesh(ringGeo, pink, group, [0, .35, 0], [6.5, 6.5, 6.5]);
       commandRing.rotation.x = Math.PI / 2;
@@ -1637,6 +1681,84 @@
     }
 
     const mothership = createMothership();
+
+    // Baterias de defesa ficam presas à superfície e acompanham a rotação do planeta.
+    const defenseTurrets = [];
+    const defenseBeams = [];
+    const defenseBeamGeo = new THREE.CylinderGeometry(1.3, 1.3, 1, 6);
+    const defenseBeamMaterial = new THREE.MeshBasicMaterial({
+      color: 0x65e9ff, transparent: true, opacity: .9, depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    for (let i = 0; i < 12; i++) {
+      // Distribuição em espiral para cobrir todos os lados do planeta.
+      const height = 1 - 2 * (i + .5) / 12;
+      const radius = Math.sqrt(1 - height * height);
+      const angle = i * Math.PI * (3 - Math.sqrt(5));
+      const normal = new V3(radius * Math.cos(angle), height, radius * Math.sin(angle));
+      const turret = new THREE.Group();
+      turret.position.copy(normal).multiplyScalar(574);
+      turret.quaternion.setFromUnitVectors(UP_AXIS, normal);
+      mesh(new THREE.CylinderGeometry(10, 14, 6, 8), darkMetal, turret, [0, 0, 0]);
+      mesh(boxGeo, armor, turret, [0, 6, 0], [12, 6, 12]);
+      mesh(boxGeo, weaponAccent, turret, [0, 15, 0], [4, 18, 4]);
+      mesh(ballGeo, cyan, turret, [0, 24, 0], [3, 2, 3]);
+      planet.add(turret);
+      defenseTurrets.push(turret);
+    }
+    let defenseCooldown = 1.4;
+    let defenseVolley = 0;
+
+    function clearDefenseBeam(beam) {
+      scene.remove(beam.mesh);
+      beam.mesh.material.dispose();
+    }
+
+    function updatePlanetDefenses(dt) {
+      for (let i = defenseBeams.length - 1; i >= 0; i--) {
+        const beam = defenseBeams[i];
+        beam.life -= dt;
+        if (beam.life <= 0) {
+          clearDefenseBeam(beam);
+          defenseBeams.splice(i, 1);
+        } else {
+          beam.mesh.material.opacity = .9 * beam.life / .26;
+        }
+      }
+
+      if (!mothership.visible ||
+        mothership.group.position.distanceToSquared(planet.position) > 2750 ** 2) return;
+      defenseCooldown -= dt;
+      if (defenseCooldown > 0) return;
+      planet.updateMatrixWorld(true);
+      const available = [];
+      for (const turret of defenseTurrets) {
+        const origin = turret.getWorldPosition(new V3());
+        const normal = origin.clone().sub(planet.position).normalize();
+        const direction = new V3().subVectors(mothership.group.position, origin).normalize();
+        if (normal.dot(direction) > .4) available.push(turret);
+      }
+      if (!available.length) { defenseCooldown = 1; return; }
+      const selected = available[defenseVolley % available.length];
+
+      const origin = selected.localToWorld(new V3(0, 25, 0));
+      const target = mothership.group.position.clone()
+        .add(new V3(rand(-28, 28), rand(-18, 18), rand(-28, 28)));
+      const path = target.sub(origin);
+      const beamMesh = new THREE.Mesh(defenseBeamGeo, defenseBeamMaterial.clone());
+      beamMesh.position.copy(origin).addScaledVector(path, .5);
+      beamMesh.quaternion.setFromUnitVectors(UP_AXIS, path.clone().normalize());
+      beamMesh.scale.set(1, path.length(), 1);
+      scene.add(beamMesh);
+      defenseBeams.push({ mesh: beamMesh, life: .26 });
+      burst(mothership.group.position, 0x6de8ff, 22, 14);
+      mothership.hp -= 3;
+      if (mothership.hp <= 0) destroyMothership();
+      if (defenseVolley++ === 0) {
+        queueEvent("AURORA // BATERIAS PLANETÁRIAS DISPARAM CONTRA A NAVE-MÃE", "ally");
+      }
+      defenseCooldown = 1.15;
+    }
 
     // ============================================================
     // ESTADO E PROJÉTEIS
@@ -1942,7 +2064,7 @@
           impact = boss.group.position.distanceToSquared(bomb.mesh.position) < 24 * 24;
         }
         if (!impact && mothership.visible) {
-          impact = mothership.group.position.distanceToSquared(bomb.mesh.position) < 48 * 48;
+          impact = mothership.group.position.distanceToSquared(bomb.mesh.position) < 90 * 90;
         }
 
         if (impact || bomb.life <= 0) detonateBomb(i);
@@ -2055,7 +2177,7 @@
 
           if (!hit && mothership.visible && segmentDistanceSquared(
             mothership.group.position, bullet.previous, bullet.mesh.position
-          ) < 40 * 40) {
+          ) < 86 * 86) {
             mothership.hp--;
             hitTimer = .13;
             hit = true;
@@ -2791,6 +2913,9 @@
       }
       while (stationExplosions.length) disposeStationExplosion(stationExplosions.pop());
       while (impacts.length) clearImpact(impacts.pop());
+      while (defenseBeams.length) clearDefenseBeam(defenseBeams.pop());
+      defenseCooldown = 1.4;
+      defenseVolley = 0;
 
       for (const key of Array.from(loadedSectors.keys())) unloadSector(key);
       destroyedWorldObjects.clear();
@@ -2798,6 +2923,7 @@
 
       // Restaura os marcos do sistema inicial após eventual rebasing.
       planet.position.set(-1050, 270, -2300);
+      planet.rotation.y = 0;
       atmosphere.position.copy(planet.position);
       station.position.set(0, 15, -540);
       station.visible = true;
@@ -2818,7 +2944,7 @@
         ally.hp = ally.maxHp;
         ally.respawn = 0;
       });
-      allySpawnTimer = rand(20, 32);
+      allySpawnTimer = rand(9, 15);
       boss.visible = false;
       boss.group.visible = false;
       boss.hp = Math.round(CONFIG.bossHp * difficultyScale());
@@ -3170,7 +3296,8 @@
 
         temp.normalize();
 
-        const approach = distance > 115 ? 22 : distance < 48 ? -18 : 0;
+        const approach = distance > 115 ? [22, 37, 13][drone.kind] :
+          distance < 48 ? -18 : 0;
         p.addScaledVector(temp, approach * dt);
 
         p.x += Math.cos(time * .65 + drone.phase) * dt * 7;
@@ -3181,7 +3308,8 @@
           arm.rotation.z = Math.sin(time * 2.2 + drone.phase + i) * .18;
         });
 
-        drone.core.scale.setScalar(.75 + Math.sin(time * 5 + drone.phase) * .08);
+        drone.core.scale.copy(drone.coreScale)
+          .multiplyScalar(1 + Math.sin(time * 5 + drone.phase) * .1);
         drone.engine.rotation.z += dt * 2;
 
         drone.cooldown -= dt;
@@ -3195,8 +3323,10 @@
             .addScaledVector(target.velocity, Math.min(distance / 110, 1) * .55)
             .add(new V3(rand(-3, 3), rand(-3, 3), rand(-3, 3)));
 
-          spawnBullet(origin, aim.sub(origin).normalize(), true);
-          drone.cooldown = rand(1.9, 3.6) / difficultyScale();
+          spawnBullet(origin, aim.sub(origin).normalize(), true,
+            "drone", drone.kind === 2 ? 10 : drone.kind === 1 ? 6 : 9);
+          drone.cooldown = rand(1.9, 3.6) / difficultyScale() *
+            [1, .7, 1.25][drone.kind];
         }
       }
     }
@@ -3207,7 +3337,9 @@
 
       for (let i = 0; i < ready.length; i++) {
         const ally = ready[i];
-        const local = new V3((ally.index - 1) * 22, 8 + ally.index * 5, 28 + i * 9)
+        const column = ally.index % 3 - 1;
+        const row = Math.floor(ally.index / 3);
+        const local = new V3(column * 25, 10 + row * 13, 28 + row * 18 + i * 3)
           .applyQuaternion(camera.quaternion)
           .add(camera.position);
 
@@ -3231,7 +3363,7 @@
       burst(ally.group.position, 0xffa451, 70, 38);
       ally.active = false;
       ally.group.visible = false;
-      ally.respawn = rand(28, 42);
+      ally.respawn = rand(20, 32);
       queueEvent(`COMANDO // ALIADO ${ally.index + 1} ABATIDO · REFORÇO SOLICITADO`, "alert");
     }
 
@@ -3276,16 +3408,16 @@
 
         if (!targetPosition) {
           const escort = new V3(
-            (ally.index - 1) * 14,
-            8 + Math.sin(time + ally.phase) * 4,
-            28
+            (ally.index % 3 - 1) * 17,
+            8 + Math.floor(ally.index / 3) * 12 + Math.sin(time + ally.phase) * 4,
+            28 + Math.floor(ally.index / 3) * 15
           ).applyQuaternion(camera.quaternion).add(camera.position);
           temp.subVectors(escort, ally.group.position);
           ally.velocity.lerp(temp.clampLength(0, 230), 1 - Math.exp(-2.4 * dt));
         } else {
           temp.subVectors(targetPosition, ally.group.position);
           const distance = temp.length();
-          const desiredSpeed = distance > 105 ? 86 : distance < 55 ? -34 : 18;
+          const desiredSpeed = distance > 160 ? 95 : distance < 105 ? -34 : 18;
           temp.normalize().multiplyScalar(desiredSpeed);
           temp.x += Math.sin(time * 1.7 + ally.phase) * 18;
           ally.velocity.lerp(temp, 1 - Math.exp(-2.8 * dt));
@@ -3383,6 +3515,7 @@
       mothership.cooldown = 1.8;
       mothership.barrageCooldown = 4.2;
       mothership.salvo = 0;
+      defenseVolley = 0;
       queueEvent("ALERTA VERMELHO // NAVE-MÃE INIMIGA EM APROXIMAÇÃO", "alert");
     }
 
@@ -3421,7 +3554,7 @@
       }
 
       temp.normalize();
-      const approach = distance > 460 ? 24 : distance < 330 ? -13 : 0;
+      const approach = distance > 560 ? 24 : distance < 430 ? -13 : 0;
       mothership.group.position.addScaledVector(temp, approach * dt);
       mothership.group.position.x += Math.sin(time * .22 + mothership.phase) * dt * 11;
       mothership.group.position.y += Math.cos(time * .28 + mothership.phase) * dt * 6;
@@ -3583,7 +3716,7 @@
               x: (projected.x * .5 + .5) * innerWidth,
               y: (-projected.y * .5 + .5) * innerHeight,
               distance: camera.position.distanceTo(drone.group.position),
-              label: "SENTINELA"
+              label: ["SENTINELA", "INTERCEPTOR", "FORTALEZA"][drone.kind]
             };
           }
         }
@@ -3748,6 +3881,7 @@
       particleGeo.setDrawRange(0, visibleParticleCount);
       cloudShell.visible = quality !== "low";
       stationDetails.visible = quality !== "low";
+      for (const ally of allies) ally.beacon.visible = quality !== "low";
       if (quality !== "high") {
         for (const impact of impacts) {
           if (impact.light) { scene.remove(impact.light); impact.light = null; }
@@ -3801,6 +3935,7 @@
         updateAllies(dt);
         updateBoss(dt);
         updateMothership(dt);
+        updatePlanetDefenses(dt);
         updateBullets(dt);
         updateBombs(dt);
         updateParticles(dt);

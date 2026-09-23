@@ -12,10 +12,10 @@ export const CONFIG = {
   fuelDrainCruise: .20,
   fuelDrainBoost: .75,
   fuelDrainWarp: 2.2,
-  drones: 9,
-  allies: 3,
+  drones: 12,
+  allies: 6,
   bossHp: 42,
-  mothershipHp: 180,
+  mothershipHp: 260,
   cruiseSpeed: 48,
   boostSpeed: 145,
   warpSpeed: 620
