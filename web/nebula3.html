@@ -730,6 +730,357 @@
       }
     }
 
+    /* Briefing orbital: mantém a missão e os ajustes legíveis em telas pequenas. */
+    #overlay {
+      background:
+        radial-gradient(circle at 18% 20%, #12345a88, transparent 38%),
+        radial-gradient(circle at 86% 82%, #3c1b5680, transparent 42%),
+        linear-gradient(135deg, #030914f5, #01030bed);
+      isolation: isolate;
+    }
+
+    #overlay::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        radial-gradient(1px 1px at 12% 18%, #b9ecff, transparent),
+        radial-gradient(2px 2px at 73% 26%, #8fcfff, transparent),
+        radial-gradient(1px 1px at 31% 74%, #ffffff, transparent),
+        radial-gradient(2px 2px at 92% 64%, #c7a8ff, transparent),
+        radial-gradient(1px 1px at 55% 9%, #ffffff, transparent);
+      background-size: 310px 280px, 440px 390px, 275px 350px, 550px 410px, 340px 380px;
+      opacity: .52;
+    }
+
+    #overlay .panel {
+      width: min(1100px, 100%);
+      height: min(820px, calc(100dvh - 32px));
+      max-height: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #06111cee;
+      border: 1px solid #8ee5f052;
+      border-radius: 18px;
+      box-shadow: 0 32px 100px #000b, 0 0 85px #167cb222, inset 0 1px #d4f9ff26;
+    }
+
+    .briefing-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 30px;
+      min-height: 58px;
+      background: #061625;
+      border-bottom: 1px solid #75dce735;
+      font: 700 10px ui-monospace, Consolas, monospace;
+      letter-spacing: .14em;
+    }
+
+    .briefing-top .eyebrow { font-size: 10px; letter-spacing: .16em; }
+    .signal-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 6px;
+      border-radius: 50%;
+      background: #76ffbf;
+      box-shadow: 0 0 12px #76ffbf;
+    }
+    .top-divider { color: #69a2ba; margin: 0 8px; }
+    .edition-label { color: #8cacc2; text-align: right; }
+    .edition-label span { color: #ffad77; margin: 0 5px; }
+
+    .briefing-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.03fr) minmax(0, .97fr);
+      min-height: 0;
+      flex: 1;
+    }
+
+    .mission-column, .systems-column {
+      min-width: 0;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-color: #478396 #0a1b2a;
+      scrollbar-width: thin;
+    }
+
+    .mission-column {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding: 34px 38px 0;
+      background:
+        radial-gradient(circle at 80% 18%, #14577b44, transparent 38%),
+        linear-gradient(160deg, #0b2131 0%, #071728 53%, #080d21 100%);
+      border-right: 1px solid #72d6e22a;
+    }
+
+    .orbital-art {
+      position: absolute;
+      width: 228px;
+      height: 228px;
+      top: 16px;
+      right: 8px;
+      pointer-events: none;
+      opacity: .72;
+    }
+    .orbit {
+      position: absolute;
+      border: 1px solid #77e3f84a;
+      border-radius: 50%;
+      transform: rotate(-27deg) scaleY(.45);
+    }
+    .orbit-outer { inset: -5px; box-shadow: 0 0 20px #249dc52a; }
+    .orbit-inner { inset: 29px; border-color: #9dd9e833; transform: rotate(32deg) scaleY(.57); }
+    .orbital-planet {
+      position: absolute;
+      inset: 62px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 28% 24%, #73cbd5, #1b7187 31%, #123351 67%, #061522 91%);
+      box-shadow: inset -13px -10px 22px #010814, 0 0 27px #54c5de7a, 0 0 62px #1b95b555;
+    }
+    .orbiting-satellite {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      top: 40px;
+      left: 32px;
+      transform: rotate(35deg);
+      background: #a9f5ff;
+      box-shadow: 0 0 16px #7be9ff;
+    }
+    .orbiting-satellite::before, .orbiting-satellite::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      width: 14px;
+      height: 6px;
+      background: #377ca3;
+      border: 1px solid #92d9ed;
+    }
+    .orbiting-satellite::before { right: 13px; }
+    .orbiting-satellite::after { left: 13px; }
+    .art-label {
+      position: absolute;
+      bottom: 8px;
+      right: 4px;
+      color: #7eb3c5;
+      font: 10px ui-monospace, monospace;
+      letter-spacing: .12em;
+    }
+
+    .mission-intro { position: relative; z-index: 1; }
+    .section-kicker {
+      color: #7ae8ee;
+      font: 700 10px ui-monospace, Consolas, monospace;
+      letter-spacing: .18em;
+    }
+    .mission-intro h1 {
+      margin: 18px 0 16px;
+      font-family: system-ui, sans-serif;
+      font-size: clamp(48px, 5.2vw, 74px);
+      font-weight: 900;
+      letter-spacing: -.07em;
+      line-height: .94;
+      text-shadow: 0 5px 30px #001b28;
+    }
+    .mission-intro h1 em { color: #9af8f1; }
+    .mission-intro p {
+      max-width: 46ch;
+      margin: 0;
+      color: #b6d1db;
+      font: 14px/1.65 system-ui, sans-serif;
+    }
+
+    .mission-objectives {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .mission-objectives > div {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 11px 10px;
+      border: 1px solid #7ad7e233;
+      border-radius: 8px;
+      background: #1230479c;
+      color: #98bac9;
+      font: 700 10px/1.45 ui-monospace, monospace;
+      letter-spacing: .04em;
+    }
+    .mission-objectives strong { color: #e5faff; font-size: 11px; }
+    .objective-number { color: #77e8ed; font-size: 19px; }
+
+    .mission-column .keys {
+      margin: 0;
+      padding: 18px 0 8px;
+      border-color: #8cdeec32;
+    }
+    .section-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      color: #91afc1;
+      font-size: 10px;
+      letter-spacing: .1em;
+    }
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 0;
+      border-bottom: 1px solid #77aec11a;
+      font: 11px/1.4 ui-monospace, Consolas, monospace;
+    }
+    .control-row span { flex: 0 0 33%; color: #9dbbc8; }
+    .control-row strong { color: #e3f9ff; text-align: right; font-weight: 600; }
+    .control-row i { color: #58bfd0; font-style: normal; }
+    .controller-guide { padding-top: 12px; font: 11px/1.5 ui-monospace, monospace; }
+    .controller-guide summary { color: #85e9ed; cursor: pointer; }
+    .controller-guide p { font-size: 11px; line-height: 1.6; margin: 8px 0; }
+
+    .mission-action {
+      position: sticky;
+      bottom: 0;
+      margin: auto -38px 0;
+      padding: 16px 38px 20px;
+      background: linear-gradient(0deg, #071626 86%, #07162600);
+      border-top: 1px solid #75dce72d;
+      z-index: 2;
+    }
+    #bestScore { margin: 0 0 10px; color: #f6c890; font: 700 11px ui-monospace, monospace; letter-spacing: .12em; }
+    #start {
+      min-height: 56px;
+      border: 0;
+      border-radius: 8px;
+      background: linear-gradient(100deg, #8cf9ee, #61c8ee);
+      box-shadow: 0 8px 30px #2abbd344;
+      color: #062133;
+      font: 800 13px ui-monospace, monospace;
+      letter-spacing: .15em;
+    }
+    #start:hover:not(:disabled) { background: #c6fff8; transform: translateY(-1px); }
+    #status { margin: 8px 0 0; color: #c1e1e9; font: 11px/1.5 ui-monospace, monospace; }
+    .mission-action .small { margin: 5px 0 0; color: #87a9ba; font: 10px/1.5 system-ui, sans-serif; }
+
+    .systems-column { padding: 28px 30px 34px; background: #09121e; }
+    .systems-heading h2 {
+      margin: 9px 0 4px;
+      font: 800 28px/1.1 system-ui, sans-serif;
+      letter-spacing: -.04em;
+    }
+    .systems-heading h2 span { color: #7eeae8; }
+    .systems-heading p { margin: 0 0 22px; font: 13px/1.5 system-ui, sans-serif; }
+    .systems-column .settings {
+      margin: 0 0 20px;
+      padding: 17px 17px 18px;
+      border: 1px solid #6dbbc83a;
+      border-radius: 10px;
+      background: #1022329c;
+    }
+    .systems-column .settings legend {
+      padding: 0 7px;
+      color: #83e7e9;
+      font: 700 11px ui-monospace, monospace;
+      letter-spacing: .1em;
+    }
+    .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .field { min-width: 0; margin: 8px 0 14px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      color: #d8eff3;
+      font: 12px/1.4 system-ui, sans-serif;
+    }
+    .field label small { color: #93b6c4; font-size: 10px; }
+    .field output { color: #8df1e3; font-family: ui-monospace, monospace; }
+    .settings select, .settings input[type="file"] {
+      border-radius: 7px;
+      background: #061522;
+      border-color: #7cb6c45c;
+      font-size: 13px;
+    }
+    .settings input[type="file"] { font-size: 11px; }
+    .settings input[type="file"]::file-selector-button { background: #95e7ed; }
+    .settings input[type="range"] { width: 100%; accent-color: #81ede7; min-height: 28px; }
+    .systems-column .check-row { min-height: 36px; margin: 4px 0 10px; font: 13px/1.4 system-ui, sans-serif; }
+    .music-player {
+      padding: 12px;
+      margin: 8px 0 14px;
+      border-radius: 9px;
+      background: #040d18;
+      border: 1px solid #8adce43b;
+    }
+    .player-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: #88cad0;
+      font: 700 10px ui-monospace, monospace;
+      letter-spacing: .1em;
+    }
+    #youtubeMusic { min-height: 0; margin-top: 10px; border-radius: 6px; }
+    #bgMusic { margin-top: 10px; }
+    #musicStatus { margin: 10px 0 0; font: 11px/1.5 system-ui, sans-serif; }
+    .audio-controls { padding-top: 12px; border-top: 1px solid #7ad6e02b; }
+    .secondary-button {
+      min-height: 40px;
+      padding: 9px 14px;
+      border: 1px solid #75d7e270;
+      border-radius: 6px;
+      background: #143849;
+      color: #d9f9ff;
+      font: 700 11px ui-monospace, monospace;
+      letter-spacing: .09em;
+    }
+    .secondary-button:hover { background: #22576a; }
+    .input-settings #gamepadStatus { margin: 4px 0 0; font: 11px/1.5 ui-monospace, monospace; color: #9cc5cd; }
+
+    @media (max-width: 820px) {
+      #overlay { padding: 10px; }
+      #overlay .panel { height: auto; min-height: 0; overflow: visible; margin-block: auto; }
+      .briefing-layout { display: block; }
+      .mission-column, .systems-column { overflow: visible; }
+      .mission-column { padding: 30px 25px 0; border-right: 0; border-bottom: 1px solid #72d6e23a; }
+      .mission-action { position: static; margin: 0 -25px; padding: 16px 25px 22px; }
+      .systems-column { padding: 26px 25px 30px; }
+      .orbital-art { right: 6px; width: 185px; height: 185px; opacity: .45; }
+      .orbital-planet { inset: 50px; }
+    }
+
+    @media (max-width: 520px) {
+      .briefing-top { padding: 12px 18px; align-items: flex-start; }
+      .briefing-top .eyebrow { line-height: 1.6; }
+      .edition-label { display: none; }
+      .mission-column { gap: 16px; padding: 24px 18px 0; }
+      .mission-intro h1 { font-size: clamp(42px, 11vw, 60px); }
+      .mission-objectives { gap: 5px; }
+      .mission-objectives > div { display: block; padding: 8px; font-size: 9px; }
+      .objective-number { display: block; font-size: 17px; }
+      .mission-objectives strong { font-size: 10px; }
+      .control-row { font-size: 10px; }
+      .mission-action { margin: 0 -18px; padding: 16px 18px 20px; }
+      .systems-column { padding: 22px 18px 26px; }
+      .settings-grid { grid-template-columns: 1fr; gap: 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #start:hover:not(:disabled) { transform: none; }
+    }
+
   </style>
 
 </head>
@@ -804,124 +1155,137 @@
   </div>
 
   <div id="overlay">
-    <div class="panel">
-      <div class="eyebrow">EXPERIMENTO INTERATIVO // THREE.JS</div>
-      <h1 id="title">ÓRBITA<br><em>FANTASMA.</em></h1>
-      <p id="description">
-        Pilote um interceptador experimental entre máquinas autônomas,
-        ruínas orbitais e tempestades de plasma. Elimine os sentinelas.
-        Preserve seu escudo.
-      </p>
-
-      <div class="keys">
-        <div id="desktopHelp">
-          WASD — movimentar / MOUSE ou SETAS — mirar<br>
-          ESPAÇO / CTRL — subir e descer<br>
-          CLIQUE ESQUERDO ou J — disparar / SHIFT — turbo<br>
-          CLIQUE DIREITO ou B — bomba / V — alternar 1ª/3ª pessoa<br>
-          F — hipervelocidade / P — pausa / R — reiniciar<br>
-          JOYPAD XBOX — esquerdo mirar · direito mover · A/RB atirar · B bomba · RT avançar · LT turbo<br>
-          A subir · X descer · B bomba · Y visão · LB salto · MENU pausa
-        </div>
-
-        <div id="touchHelp">
-          Direcional esquerdo — movimentar<br>
-          Arraste na área direita — mirar<br>
-          Segure TIRO, TURBO, SUBIR ou DESCER para usar<br>
-          Use BOMBA em perigo crítico / SALTO para hipervelocidade<br>
-          VISÃO alterna 1ª/3ª pessoa / PAUSA abre o menu
-        </div>
+    <div class="panel" role="dialog" aria-label="Painel da missão Nebula 3">
+      <div class="briefing-top">
+        <div class="eyebrow"><span class="signal-dot"></span> NEXUS / 07 <span class="top-divider">//</span> COMANDO ORBITAL</div>
+        <span class="edition-label">NEBULA 3 <span>•</span> OPERAÇÃO ÓRBITA FANTASMA</span>
       </div>
 
-      <fieldset class="settings">
-        <legend>TRILHA SONORA E CONTROLES</legend>
+      <div class="briefing-layout">
+        <section class="mission-column" aria-label="Resumo e início da missão">
+          <div class="orbital-art" aria-hidden="true">
+            <div class="orbit orbit-outer"></div>
+            <div class="orbit orbit-inner"></div>
+            <div class="orbital-planet"></div>
+            <div class="orbiting-satellite"></div>
+            <span class="art-label">AURORA // SETOR 07</span>
+          </div>
+          <div class="mission-intro">
+            <span class="section-kicker">BRIEFING // 01</span>
+            <h1 id="title">ÓRBITA<br><em>FANTASMA.</em></h1>
+            <p id="description">
+              Pilote um interceptador experimental entre máquinas autônomas,
+              ruínas orbitais e tempestades de plasma. Elimine os sentinelas.
+              Preserve seu escudo.
+            </p>
+          </div>
 
-        <label for="musicFiles">Adicionar músicas do dispositivo</label>
-        <input
-          id="musicFiles"
-          type="file"
-          accept="audio/*"
-          multiple
-          aria-describedby="musicStatus"
-        />
+          <div class="mission-objectives" aria-label="Objetivos da missão">
+            <div><span class="objective-number">01</span><span>DEFENDA<br><strong>AURORA</strong></span></div>
+            <div><span class="objective-number">02</span><span>ENFRENTE<br><strong>A FROTA</strong></span></div>
+            <div><span class="objective-number">03</span><span>EXPLORE<br><strong>O SETOR</strong></span></div>
+          </div>
 
-        <label for="musicSelect">Trilha de fundo</label>
-        <select id="musicSelect">
-          <option value="youtube:huXVnd-QnNs" selected>Trilha padrão — YouTube</option>
-          <option value="">Sem trilha sonora</option>
-        </select>
+          <div class="keys">
+            <div class="section-heading"><span class="section-kicker">PILOTAGEM // 02</span><span>GUIA RÁPIDO</span></div>
+            <div id="desktopHelp">
+              <div class="control-row"><span>MOVER / MIRAR</span><strong>WASD <i>+</i> MOUSE OU SETAS</strong></div>
+              <div class="control-row"><span>SUBIR / DESCER</span><strong>ESPAÇO <i>/</i> CTRL</strong></div>
+              <div class="control-row"><span>ATIRAR / BOMBA</span><strong>CLIQUE ESQUERDO OU J <i>/</i> DIREITO OU B</strong></div>
+              <div class="control-row"><span>TURBO / SALTO</span><strong>SHIFT <i>/</i> F</strong></div>
+              <div class="control-row"><span>VISÃO / MENU</span><strong>V <i>/</i> P</strong></div>
+              <details class="controller-guide">
+                <summary>VER CONTROLES DO JOYPAD XBOX E REINÍCIO</summary>
+                <p>Analógico esquerdo: mirar · direito: mover · RT: avançar · LT: turbo · A ou RB: atirar · B: bomba · X: descer · Y: visão · LB: salto · MENU: pausa · VIEW: reiniciar.</p>
+              </details>
+            </div>
+            <div id="touchHelp">
+              <div class="control-row"><span>MOVER / MIRAR</span><strong>DIRECIONAL <i>/</i> ARRASTE À DIREITA</strong></div>
+              <div class="control-row"><span>COMBATE</span><strong>TIRO <i>/</i> BOMBA <i>/</i> TURBO</strong></div>
+              <div class="control-row"><span>NAVEGAR</span><strong>SUBIR <i>/</i> DESCER <i>/</i> SALTO</strong></div>
+              <div class="control-row"><span>VISÃO / MENU</span><strong>VISÃO <i>/</i> PAUSA</strong></div>
+            </div>
+          </div>
 
-        <label class="check-row">
-          <input id="musicEnabled" type="checkbox" checked />
-          <span>Reproduzir música durante a missão</span>
-        </label>
+          <div class="mission-action">
+            <p id="bestScore">RECORDE // 000000 PTS</p>
+            <button id="start" disabled>CARREGANDO SISTEMAS...</button>
+            <p id="status" role="status" aria-live="polite">Inicializando renderização e shaders.</p>
+            <p class="small">Teclado, mouse, joypad e toque. No celular, jogue com a tela deitada. Contém flashes e movimento intenso.</p>
+          </div>
+        </section>
 
-        <label class="check-row">
-          <input id="effectsEnabled" type="checkbox" checked />
-          <span>Efeitos sonoros de combate</span>
-        </label>
+        <section class="systems-column" aria-label="Configurações da missão">
+          <div class="systems-heading">
+            <span class="section-kicker">CENTRAL DE SISTEMAS // 03</span>
+            <h2>Prepare a nave<span>.</span></h2>
+            <p>Ajuste a experiência antes de entrar em órbita.</p>
+          </div>
 
-        <label for="effectsVolume">Volume dos efeitos: <output id="effectsVolumeValue">60%</output></label>
-        <input id="effectsVolume" type="range" min="0" max="100" value="60" step="5" />
-        <button id="previewEffects" type="button">OUVIR EFEITOS</button>
+          <fieldset class="settings">
+            <legend>01 / MISSÃO E VISUAL</legend>
+            <div class="settings-grid">
+              <div class="field"><label for="difficulty">Dificuldade <small>vale na próxima missão</small></label>
+                <select id="difficulty">
+                  <option value="easy">Explorador</option>
+                  <option value="normal" selected>Padrão</option>
+                  <option value="hard">Veterano</option>
+                </select>
+              </div>
+              <div class="field"><label for="quality">Qualidade gráfica</label>
+                <select id="quality">
+                  <option value="low">Econômica</option>
+                  <option value="auto" selected>Automática</option>
+                  <option value="high">Alta</option>
+                </select>
+              </div>
+            </div>
+            <div class="field"><label for="sensitivity">Sensibilidade da mira <output id="sensitivityValue">100%</output></label>
+              <input id="sensitivity" type="range" min="40" max="200" value="100" step="10" />
+            </div>
+          </fieldset>
 
-        <label for="sensitivity">Sensibilidade da mira: <output id="sensitivityValue">100%</output></label>
-        <input id="sensitivity" type="range" min="40" max="200" value="100" step="10" />
+          <fieldset class="settings">
+            <legend>02 / ÁUDIO E TRILHA</legend>
+            <label class="check-row"><input id="musicEnabled" type="checkbox" checked /><span>Reproduzir música durante a missão</span></label>
+            <div class="field"><label for="musicSelect">Trilha de fundo</label>
+              <select id="musicSelect">
+                <option value="youtube:huXVnd-QnNs" selected>Trilha padrão — YouTube</option>
+                <option value="">Sem trilha sonora</option>
+              </select>
+            </div>
+            <div class="field"><label for="musicFiles">Ou adicione músicas do dispositivo</label>
+              <input id="musicFiles" type="file" accept="audio/*" multiple aria-describedby="musicStatus" />
+            </div>
+            <div class="music-player">
+              <div class="player-label"><span>PLAYER OFICIAL</span><span>TRILHA PADRÃO</span></div>
+              <audio id="bgMusic" controls loop preload="metadata" aria-label="Prévia e controles da trilha sonora" hidden></audio>
+              <iframe
+                id="youtubeMusic"
+                title="Player da trilha sonora padrão no YouTube"
+                src="https://www.youtube-nocookie.com/embed/huXVnd-QnNs?enablejsapi=1&controls=1&rel=0"
+                allow="autoplay; encrypted-media; picture-in-picture"
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen
+              ></iframe>
+              <p id="musicStatus" role="status" aria-live="polite">Trilha padrão do YouTube selecionada. Ela começará ao iniciar a missão.</p>
+            </div>
+            <div class="audio-controls">
+              <label class="check-row"><input id="effectsEnabled" type="checkbox" checked /><span>Efeitos sonoros de combate</span></label>
+              <div class="field"><label for="effectsVolume">Volume dos efeitos <output id="effectsVolumeValue">60%</output></label>
+                <input id="effectsVolume" type="range" min="0" max="100" value="60" step="5" />
+              </div>
+              <button id="previewEffects" class="secondary-button" type="button">OUVIR EFEITOS</button>
+            </div>
+          </fieldset>
 
-        <label for="difficulty">Dificuldade (vale na próxima missão)</label>
-        <select id="difficulty">
-          <option value="easy">Explorador</option>
-          <option value="normal" selected>Padrão</option>
-          <option value="hard">Veterano</option>
-        </select>
-
-        <label for="quality">Qualidade gráfica</label>
-        <select id="quality">
-          <option value="low">Econômica</option>
-          <option value="auto" selected>Automática</option>
-          <option value="high">Alta</option>
-        </select>
-        <p id="bestScore">RECORDE // 000000 PTS</p>
-
-        <audio
-          id="bgMusic"
-          controls
-          loop
-          preload="metadata"
-          aria-label="Prévia e controles da trilha sonora"
-          hidden
-        ></audio>
-
-        <iframe
-          id="youtubeMusic"
-          title="Player da trilha sonora padrão no YouTube"
-          src="https://www.youtube-nocookie.com/embed/huXVnd-QnNs?enablejsapi=1&controls=1&rel=0"
-          allow="autoplay; encrypted-media; picture-in-picture"
-          referrerpolicy="strict-origin-when-cross-origin"
-          allowfullscreen
-        ></iframe>
-
-        <p id="musicStatus" role="status" aria-live="polite">
-          Trilha padrão do YouTube selecionada. Ela começará ao iniciar a missão.
-        </p>
-
-        <label class="check-row">
-          <input id="touchEnabled" type="checkbox" />
-          <span>Exibir controles de toque</span>
-        </label>
-
-        <p id="gamepadStatus" role="status" aria-live="polite">
-          Joypad: aguardando conexão.
-        </p>
-      </fieldset>
-
-      <button id="start" disabled>CARREGANDO SISTEMAS...</button>
-      <p id="status">Inicializando renderização e shaders.</p>
-      <p class="small">
-        Compatível com teclado, mouse e controles de toque.
-        No smartphone, experimente jogar com a tela deitada.
-        Contém flashes e movimento intenso.
-      </p>
+          <fieldset class="settings input-settings">
+            <legend>03 / ENTRADA</legend>
+            <label class="check-row"><input id="touchEnabled" type="checkbox" /><span>Exibir controles de toque</span></label>
+            <p id="gamepadStatus" role="status" aria-live="polite">Joypad: aguardando conexão.</p>
+          </fieldset>
+        </section>
+      </div>
     </div>
   </div>
 
