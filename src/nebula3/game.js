@@ -3,6 +3,7 @@
     import { CombatAudio } from "./combatAudio.ts";
     import { upgradeShipVisuals, upgradeBossVisual } from "./shipModel.ts";
     import { createCapitalShip } from "./capitalShip.ts";
+    import { createCivilianConvoy } from "./convoy.ts";
     import { segmentDistanceSquared } from "./collision.ts";
     import { moveAgainstSolids } from "./solidCollision.ts";
 
@@ -1104,6 +1105,10 @@
       for (const beam of defenseBeams) beam.mesh.position.sub(shift);
       for (const beam of alliedBeams) beam.mesh.position.sub(shift);
       for (const battle of distantBattles) battle.group.position.sub(shift);
+      if (convoy) {
+        convoy.group.position.sub(shift);
+        convoy.destination.sub(shift);
+      }
 
       for (let i = 0; i < CONFIG.particles; i++) {
         if (particleLives[i] <= 0) continue;
@@ -1751,6 +1756,83 @@
       return mothershipHitZones.some(([x, y, z, radius]) =>
         segmentDistanceSquared(new V3(x, y, z), localStart, localEnd) < radius * radius
       );
+    }
+
+    let convoy = null;
+    let nextConvoy = rand(35, 50);
+
+    function clearConvoy() {
+      if (!convoy) return;
+      scene.remove(convoy.group);
+      convoy = null;
+    }
+
+    function finishConvoy(arrived) {
+      if (!convoy) return;
+      const survivors = convoy.ships.filter(ship => ship.alive).length;
+      if (arrived && survivors) {
+        score += survivors * 180;
+        affectCivilization({ economy: survivors, trade: survivors * 2, stability: survivors },
+          `AURORA // ${survivors} CARGUEIRO${survivors > 1 ? "S" : ""} CHEGARAM · +${survivors * 180} PTS`);
+      } else if (!survivors) {
+        affectCivilization({ economy: -2, trade: -4, stability: -5 },
+          "AURORA // COMBOIO CIVIL PERDIDO · COMÉRCIO E ESTABILIDADE REDUZIDOS");
+      }
+      clearConvoy();
+      nextConvoy = rand(75, 110);
+    }
+
+    function spawnConvoy() {
+      const height = rand(-40, 65);
+      const start = new V3(-390, height, -450)
+        .applyQuaternion(camera.quaternion).add(camera.position);
+      const destination = new V3(470, height, -560)
+        .applyQuaternion(camera.quaternion).add(camera.position);
+      if (collectSolids(start, destination, 39).some(solid =>
+        segmentDistanceSquared(solid.center, start, destination) <
+          (solid.radius + 39) ** 2)) return false;
+
+      const visual = createCivilianConvoy();
+      visual.group.position.copy(start);
+      visual.group.lookAt(destination);
+      scene.add(visual.group);
+      convoy = {
+        ...visual, destination,
+        velocity: destination.clone().sub(start).normalize().multiplyScalar(27),
+        age: 0
+      };
+      queueEvent("COMANDO // ESCOLTE 3 CARGUEIROS CIVIS ATÉ A ROTA DE SAÍDA", "ally");
+      return true;
+    }
+
+    function updateConvoy(dt) {
+      if (!convoy) {
+        nextConvoy -= dt;
+        if (nextConvoy <= 0) nextConvoy = spawnConvoy() ? rand(75, 110) : 12;
+        return;
+      }
+      convoy.age += dt;
+      const remaining = convoy.group.position.distanceTo(convoy.destination);
+      if (remaining <= 2) {
+        finishConvoy(true);
+        return;
+      }
+      if (convoy.age > 55) {
+        clearConvoy();
+        nextConvoy = rand(75, 110);
+        return;
+      }
+      if (convoy.group.position.distanceToSquared(camera.position) > 1900 ** 2) {
+        queueEvent("SENSORES // COMBOIO SAIU DO ALCANCE DE ESCOLTA", "alert");
+        clearConvoy();
+        nextConvoy = rand(75, 110);
+        return;
+      }
+      convoy.group.position.addScaledVector(convoy.velocity, Math.min(dt, remaining / 27));
+      convoy.ships.forEach((ship, index) => {
+        ship.group.position.y = (index % 2) * 10 + Math.sin(time * 2 + index) * 1.2;
+      });
+      convoy.group.updateMatrixWorld(true);
     }
 
     const distantBattles = [];
@@ -2426,6 +2508,28 @@
               burst(bullet.mesh.position, 0x69ffc5, 22, 20);
               hit = true;
               if (ally.hp <= 0) destroyAlly(ally);
+              break;
+            }
+          }
+
+          if (!hit && convoy) {
+            convoy.group.updateMatrixWorld(true);
+            for (const ship of convoy.ships) {
+              if (!ship.alive) continue;
+              const position = ship.group.getWorldPosition(new V3());
+              if (segmentDistanceSquared(position, bullet.previous,
+                bullet.mesh.position) >= 11 ** 2) continue;
+              ship.hp = Math.max(0, ship.hp - bullet.damage);
+              burst(position, 0xffc787, 18, 16);
+              hit = true;
+              if (ship.hp <= 0) {
+                ship.alive = false;
+                ship.group.visible = false;
+                sound("blast", position);
+                burst(position, 0xff9a54, 75, 36);
+                queueEvent("COMANDO // CARGUEIRO CIVIL ABATIDO", "alert");
+                if (convoy.ships.every(other => !other.alive)) finishConvoy(false);
+              }
               break;
             }
           }
@@ -3257,6 +3361,8 @@
       while (defenseBeams.length) clearDefenseBeam(defenseBeams.pop());
       clearAlliedBeams();
       while (distantBattles.length) removeDistantBattle(distantBattles[0]);
+      clearConvoy();
+      nextConvoy = rand(35, 50);
       nextDistantBattle = rand(8, 16);
       solidImpactTimes.clear();
       defenseCooldown = 1.4;
@@ -3606,6 +3712,16 @@
     }
 
     function chooseEnemyTarget(origin, preferAllies = false) {
+      if (convoy && Math.random() < .38) {
+        convoy.group.updateMatrixWorld(true);
+        const inRange = convoy.ships.filter(ship => ship.alive &&
+          ship.group.getWorldPosition(new V3()).distanceToSquared(origin) < 560 ** 2);
+        if (inRange.length) {
+          const ship = inRange[Math.floor(Math.random() * inRange.length)];
+          return { position: ship.group.getWorldPosition(new V3()),
+            velocity: convoy.velocity, type: "convoy" };
+        }
+      }
       const availableAllies = allies.filter(ally => ally.active);
       if (availableAllies.length && Math.random() < (preferAllies ? .85 : .48)) {
         const ally = availableAllies[Math.floor(Math.random() * availableAllies.length)];
@@ -4274,6 +4390,19 @@
         radar.fillRect(118 + sx, 118 + sy, 4, 4);
       }
 
+      if (convoy) {
+        radarVector.subVectors(convoy.group.position, camera.position)
+          .applyQuaternion(inverseQuaternion);
+        let cx = radarVector.x * .42;
+        let cy = radarVector.z * .42;
+        const range = Math.hypot(cx, cy);
+        if (range > 106) { cx *= 106 / range; cy *= 106 / range; }
+        radar.fillStyle = "#ffe0a0";
+        radar.fillRect(115 + cx, 115 + cy, 10, 10);
+        radar.fillStyle = "#123b43";
+        radar.fillRect(118 + cx, 118 + cy, 4, 4);
+      }
+
       for (const battle of distantBattles) {
         radarVector.subVectors(battle.group.position, camera.position)
           .applyQuaternion(inverseQuaternion);
@@ -4449,6 +4578,7 @@
 
         updatePlayer(dt);
         updateWorldObjects(dt);
+        updateConvoy(dt);
         updateDrones(dt);
         updateAllies(dt);
         updateBoss(dt);
