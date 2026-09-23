@@ -815,12 +815,26 @@
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      padding: 34px 38px 0;
+      padding: 0;
+      overflow: hidden;
       background:
         radial-gradient(circle at 80% 18%, #14577b44, transparent 38%),
         linear-gradient(160deg, #0b2131 0%, #071728 53%, #080d21 100%);
       border-right: 1px solid #72d6e22a;
+    }
+
+    .mission-scroll {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex: 1;
+      min-height: 0;
+      padding: 34px 38px 20px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-color: #478396 #0a1b2a;
+      scrollbar-width: thin;
     }
 
     .orbital-art {
@@ -886,7 +900,7 @@
     .mission-intro h1 {
       margin: 18px 0 16px;
       font-family: system-ui, sans-serif;
-      font-size: clamp(48px, 5.2vw, 74px);
+      font-size: clamp(48px, 4.8vw, 68px);
       font-weight: 900;
       letter-spacing: -.07em;
       line-height: .94;
@@ -950,11 +964,10 @@
     .controller-guide p { font-size: 11px; line-height: 1.6; margin: 8px 0; }
 
     .mission-action {
-      position: sticky;
-      bottom: 0;
-      margin: auto -38px 0;
+      flex-shrink: 0;
+      margin: 0;
       padding: 16px 38px 20px;
-      background: linear-gradient(0deg, #071626 86%, #07162600);
+      background: #071626;
       border-top: 1px solid #75dce72d;
       z-index: 2;
     }
@@ -1053,9 +1066,10 @@
       #overlay { padding: 10px; }
       #overlay .panel { height: auto; min-height: 0; overflow: visible; margin-block: auto; }
       .briefing-layout { display: block; }
-      .mission-column, .systems-column { overflow: visible; }
-      .mission-column { padding: 30px 25px 0; border-right: 0; border-bottom: 1px solid #72d6e23a; }
-      .mission-action { position: static; margin: 0 -25px; padding: 16px 25px 22px; }
+      .mission-column, .mission-scroll, .systems-column { overflow: visible; }
+      .mission-column { border-right: 0; border-bottom: 1px solid #72d6e23a; }
+      .mission-scroll { padding: 30px 25px 20px; }
+      .mission-action { padding: 16px 25px 22px; }
       .systems-column { padding: 26px 25px 30px; }
       .orbital-art { right: 6px; width: 185px; height: 185px; opacity: .45; }
       .orbital-planet { inset: 50px; }
@@ -1065,14 +1079,14 @@
       .briefing-top { padding: 12px 18px; align-items: flex-start; }
       .briefing-top .eyebrow { line-height: 1.6; }
       .edition-label { display: none; }
-      .mission-column { gap: 16px; padding: 24px 18px 0; }
+      .mission-scroll { gap: 16px; padding: 24px 18px 20px; }
       .mission-intro h1 { font-size: clamp(42px, 11vw, 60px); }
       .mission-objectives { gap: 5px; }
       .mission-objectives > div { display: block; padding: 8px; font-size: 9px; }
       .objective-number { display: block; font-size: 17px; }
       .mission-objectives strong { font-size: 10px; }
       .control-row { font-size: 10px; }
-      .mission-action { margin: 0 -18px; padding: 16px 18px 20px; }
+      .mission-action { padding: 16px 18px 20px; }
       .systems-column { padding: 22px 18px 26px; }
       .settings-grid { grid-template-columns: 1fr; gap: 0; }
     }
@@ -1163,47 +1177,49 @@
 
       <div class="briefing-layout">
         <section class="mission-column" aria-label="Resumo e início da missão">
-          <div class="orbital-art" aria-hidden="true">
-            <div class="orbit orbit-outer"></div>
-            <div class="orbit orbit-inner"></div>
-            <div class="orbital-planet"></div>
-            <div class="orbiting-satellite"></div>
-            <span class="art-label">AURORA // SETOR 07</span>
-          </div>
-          <div class="mission-intro">
-            <span class="section-kicker">BRIEFING // 01</span>
-            <h1 id="title">ÓRBITA<br><em>FANTASMA.</em></h1>
-            <p id="description">
-              Pilote um interceptador experimental entre máquinas autônomas,
-              ruínas orbitais e tempestades de plasma. Elimine os sentinelas.
-              Preserve seu escudo.
-            </p>
-          </div>
-
-          <div class="mission-objectives" aria-label="Objetivos da missão">
-            <div><span class="objective-number">01</span><span>DEFENDA<br><strong>AURORA</strong></span></div>
-            <div><span class="objective-number">02</span><span>ENFRENTE<br><strong>A FROTA</strong></span></div>
-            <div><span class="objective-number">03</span><span>EXPLORE<br><strong>O SETOR</strong></span></div>
-          </div>
-
-          <div class="keys">
-            <div class="section-heading"><span class="section-kicker">PILOTAGEM // 02</span><span>GUIA RÁPIDO</span></div>
-            <div id="desktopHelp">
-              <div class="control-row"><span>MOVER / MIRAR</span><strong>WASD <i>+</i> MOUSE OU SETAS</strong></div>
-              <div class="control-row"><span>SUBIR / DESCER</span><strong>ESPAÇO <i>/</i> CTRL</strong></div>
-              <div class="control-row"><span>ATIRAR / BOMBA</span><strong>CLIQUE ESQUERDO OU J <i>/</i> DIREITO OU B</strong></div>
-              <div class="control-row"><span>TURBO / SALTO</span><strong>SHIFT <i>/</i> F</strong></div>
-              <div class="control-row"><span>VISÃO / MENU</span><strong>V <i>/</i> P</strong></div>
-              <details class="controller-guide">
-                <summary>VER CONTROLES DO JOYPAD XBOX E REINÍCIO</summary>
-                <p>Analógico esquerdo: mirar · direito: mover · RT: avançar · LT: turbo · A ou RB: atirar · B: bomba · X: descer · Y: visão · LB: salto · MENU: pausa · VIEW: reiniciar.</p>
-              </details>
+          <div class="mission-scroll">
+            <div class="orbital-art" aria-hidden="true">
+              <div class="orbit orbit-outer"></div>
+              <div class="orbit orbit-inner"></div>
+              <div class="orbital-planet"></div>
+              <div class="orbiting-satellite"></div>
+              <span class="art-label">AURORA // SETOR 07</span>
             </div>
-            <div id="touchHelp">
-              <div class="control-row"><span>MOVER / MIRAR</span><strong>DIRECIONAL <i>/</i> ARRASTE À DIREITA</strong></div>
-              <div class="control-row"><span>COMBATE</span><strong>TIRO <i>/</i> BOMBA <i>/</i> TURBO</strong></div>
-              <div class="control-row"><span>NAVEGAR</span><strong>SUBIR <i>/</i> DESCER <i>/</i> SALTO</strong></div>
-              <div class="control-row"><span>VISÃO / MENU</span><strong>VISÃO <i>/</i> PAUSA</strong></div>
+            <div class="mission-intro">
+              <span class="section-kicker">BRIEFING // 01</span>
+              <h1 id="title">ÓRBITA<br><em>FANTASMA.</em></h1>
+              <p id="description">
+                Pilote um interceptador experimental entre máquinas autônomas,
+                ruínas orbitais e tempestades de plasma. Elimine os sentinelas.
+                Preserve seu escudo.
+              </p>
+            </div>
+
+            <div class="mission-objectives" aria-label="Objetivos da missão">
+              <div><span class="objective-number">01</span><span>DEFENDA<br><strong>AURORA</strong></span></div>
+              <div><span class="objective-number">02</span><span>ENFRENTE<br><strong>A FROTA</strong></span></div>
+              <div><span class="objective-number">03</span><span>EXPLORE<br><strong>O SETOR</strong></span></div>
+            </div>
+
+            <div class="keys">
+              <div class="section-heading"><span class="section-kicker">PILOTAGEM // 02</span><span>GUIA RÁPIDO</span></div>
+              <div id="desktopHelp">
+                <div class="control-row"><span>MOVER / MIRAR</span><strong>WASD <i>+</i> MOUSE OU SETAS</strong></div>
+                <div class="control-row"><span>SUBIR / DESCER</span><strong>ESPAÇO <i>/</i> CTRL</strong></div>
+                <div class="control-row"><span>ATIRAR / BOMBA</span><strong>CLIQUE ESQUERDO OU J <i>/</i> DIREITO OU B</strong></div>
+                <div class="control-row"><span>TURBO / SALTO</span><strong>SHIFT <i>/</i> F</strong></div>
+                <div class="control-row"><span>VISÃO / MENU</span><strong>V <i>/</i> P</strong></div>
+                <details class="controller-guide">
+                  <summary>VER CONTROLES DO JOYPAD XBOX E REINÍCIO</summary>
+                  <p>Analógico esquerdo: mirar · direito: mover · RT: avançar · LT: turbo · A ou RB: atirar · B: bomba · X: descer · Y: visão · LB: salto · MENU: pausa · VIEW: reiniciar.</p>
+                </details>
+              </div>
+              <div id="touchHelp">
+                <div class="control-row"><span>MOVER / MIRAR</span><strong>DIRECIONAL <i>/</i> ARRASTE À DIREITA</strong></div>
+                <div class="control-row"><span>COMBATE</span><strong>TIRO <i>/</i> BOMBA <i>/</i> TURBO</strong></div>
+                <div class="control-row"><span>NAVEGAR</span><strong>SUBIR <i>/</i> DESCER <i>/</i> SALTO</strong></div>
+                <div class="control-row"><span>VISÃO / MENU</span><strong>VISÃO <i>/</i> PAUSA</strong></div>
+              </div>
             </div>
           </div>
 
