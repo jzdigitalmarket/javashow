@@ -2,6 +2,7 @@
     import { TOUCH_DEVICE, CONFIG } from "./config.ts";
     import { CombatAudio } from "./combatAudio.ts";
     import { upgradeShipVisuals, upgradeBossVisual } from "./shipModel.ts";
+    import { createCapitalShip } from "./capitalShip.ts";
     import { segmentDistanceSquared } from "./collision.ts";
     import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
     import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -1613,59 +1614,8 @@
     // NAVE-MÃE INIMIGA
     // ============================================================
 
-    const motherArmor = new THREE.MeshStandardMaterial({
-      color: 0x32154f,
-      emissive: 0x240531,
-      emissiveIntensity: 1.1,
-      roughness: .32,
-      metalness: .86
-    });
-    const motherDiskGeo = new THREE.CylinderGeometry(4.8, 6.2, 1.6, 12);
-
     function createMothership() {
-      const group = new THREE.Group();
-      group.scale.setScalar(13);
-
-      mesh(motherDiskGeo, motherArmor, group, [0, 0, 0], [1, 1, 1]);
-      mesh(ballGeo, darkMetal, group, [0, 1.25, 0], [3.2, 1.3, 3.2]);
-      const core = mesh(ballGeo, purple, group, [0, -1.05, 0], [1.5, .65, 1.5]);
-      const upperDeck = mesh(new THREE.CylinderGeometry(2, 3.5, 1.7, 8),
-        motherArmor, group, [0, 2.55, 0]);
-      upperDeck.rotation.y = Math.PI / 8;
-      for (let i = 0; i < 6; i++) {
-        const angle = i / 6 * Math.PI * 2;
-        const spine = mesh(boxGeo, armor, group,
-          [Math.cos(angle) * 3.4, 2.1, Math.sin(angle) * 3.4], [.65, 1.8, .9]);
-        spine.rotation.y = -angle;
-        const strut = mesh(boxGeo, motherArmor, group,
-          [Math.cos(angle) * 6.4, -.45, Math.sin(angle) * 6.4], [2.8, .75, .8]);
-        strut.rotation.y = -angle;
-      }
-
-      const commandRing = mesh(ringGeo, pink, group, [0, .35, 0], [6.5, 6.5, 6.5]);
-      commandRing.rotation.x = Math.PI / 2;
-
-      const turrets = [];
-      for (let i = 0; i < 8; i++) {
-        const angle = i / 8 * Math.PI * 2;
-        const turret = new THREE.Group();
-        turret.position.set(Math.cos(angle) * 5.2, .15, Math.sin(angle) * 5.2);
-        turret.rotation.y = -angle + Math.PI / 2;
-        group.add(turret);
-        mesh(boxGeo, darkMetal, turret, [0, 0, 0], [1.15, 1, 2.6]);
-        mesh(ballGeo, pink, turret, [0, 0, -1.55], [.42, .42, .3]);
-        turrets.push(turret);
-      }
-
-      for (let i = 0; i < 4; i++) {
-        const angle = i / 4 * Math.PI * 2 + Math.PI / 4;
-        const hangar = mesh(boxGeo, armor, group,
-          [Math.cos(angle) * 4.1, -.65, Math.sin(angle) * 4.1],
-          [2.3, .7, 1.5]
-        );
-        hangar.rotation.y = -angle;
-      }
-
+      const { group, core, commandRing, turrets } = createCapitalShip();
       group.visible = false;
       scene.add(group);
       return {
@@ -1681,6 +1631,21 @@
     }
 
     const mothership = createMothership();
+
+    // Multiple hit zones follow the bow, main hull and engine nacelles.
+    const mothershipHitZones = [
+      [0, 0, 16, 1.7], [0, 0, 12, 2.4], [0, 0, 7, 3.7],
+      [0, 0, 1, 5], [0, 0, -5, 5.5], [0, 0, -10, 4.4],
+      [-8.25, -.55, -7.2, 2.2], [8.25, -.55, -7.2, 2.2]
+    ];
+    function hitsMothership(start, end) {
+      mothership.group.updateMatrixWorld(true);
+      const localStart = mothership.group.worldToLocal(start.clone());
+      const localEnd = mothership.group.worldToLocal(end.clone());
+      return mothershipHitZones.some(([x, y, z, radius]) =>
+        segmentDistanceSquared(new V3(x, y, z), localStart, localEnd) < radius * radius
+      );
+    }
 
     // Baterias de defesa ficam presas à superfície e acompanham a rotação do planeta.
     const defenseTurrets = [];
@@ -2064,7 +2029,7 @@
           impact = boss.group.position.distanceToSquared(bomb.mesh.position) < 24 * 24;
         }
         if (!impact && mothership.visible) {
-          impact = mothership.group.position.distanceToSquared(bomb.mesh.position) < 90 * 90;
+          impact = hitsMothership(bomb.mesh.position, bomb.mesh.position);
         }
 
         if (impact || bomb.life <= 0) detonateBomb(i);
@@ -2175,9 +2140,7 @@
             }
           }
 
-          if (!hit && mothership.visible && segmentDistanceSquared(
-            mothership.group.position, bullet.previous, bullet.mesh.position
-          ) < 86 * 86) {
+          if (!hit && mothership.visible && hitsMothership(bullet.previous, bullet.mesh.position)) {
             mothership.hp--;
             hitTimer = .13;
             hit = true;
@@ -3572,7 +3535,7 @@
 
         for (let i = 0; i < 4; i++) {
           const turretIndex = (mothership.salvo * 2 + i * 2) % mothership.turrets.length;
-          const origin = mothership.turrets[turretIndex].getWorldPosition(new V3());
+          const origin = mothership.turrets[turretIndex].localToWorld(new V3(0, .2, 2.1));
           const aim = target.position.clone()
             .addScaledVector(target.velocity, Math.min(distance / 210, 1) * .7)
             .add(new V3(rand(-14, 14), rand(-10, 10), rand(-8, 8)));
