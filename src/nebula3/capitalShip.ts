@@ -60,7 +60,7 @@ function wingGeometry(side: number): THREE.BufferGeometry {
 
 export function createCapitalShip(): CapitalShip {
   const group = new THREE.Group();
-  group.scale.setScalar(13);
+  group.scale.setScalar(8);
 
   const hull = new THREE.MeshStandardMaterial({
     color: 0x667582, metalness: .74, roughness: .48, side: THREE.DoubleSide,
