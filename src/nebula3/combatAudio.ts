@@ -30,6 +30,7 @@ export class CombatAudio {
   private active = 0;
   private right = new Vector3();
   private direction = new Vector3();
+  private siren: OscillatorNode | null = null;
 
   constructor(
     private controls: { effects: HTMLInputElement; volume: HTMLInputElement; preview: HTMLButtonElement },
@@ -46,6 +47,31 @@ export class CombatAudio {
 
   setVolume() {
     if (this.master) this.master.gain.value = Number(this.controls.volume.value) / 100;
+  }
+
+  startSiren() {
+    const context = this.context;
+    if (this.siren || !context || !this.master || context.state !== 'running' ||
+        !this.controls.effects.checked) return;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = 'triangle';
+    gain.gain.value = .12;
+    const now = context.currentTime;
+    // Duas notas alternadas; a sirene para imediatamente ao fim da invasão.
+    for (let i = 0; i < 160; i++) {
+      oscillator.frequency.setValueAtTime(i % 2 ? 510 : 740, now + i * .48);
+    }
+    oscillator.connect(gain).connect(this.master);
+    oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+    oscillator.start();
+    this.siren = oscillator;
+  }
+
+  stopSiren() {
+    if (!this.siren) return;
+    this.siren.stop();
+    this.siren = null;
   }
 
   wake() {

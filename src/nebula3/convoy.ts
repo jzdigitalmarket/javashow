@@ -36,7 +36,7 @@ function makeCargoShield(craft: Group) {
         float rim = pow(1.0 - abs(dot(normalize(vNormal), normalize(vView))), 2.0);
         float pulse = 0.88 + 0.12 * sin(uTime * 3.5);
         float bands = pow(max(0.0, sin(vNormal.y * 22.0 + uTime * 1.5)), 8.0);
-        float alpha = (0.045 + rim * 0.54 + bands * rim * 0.12 + uHit * 0.32)
+        float alpha = (0.0225 + rim * 0.27 + bands * rim * 0.06 + uHit * 0.16)
           * pulse * uStrength;
         gl_FragColor = vec4(1.0, 0.73 + uHit * 0.15, 0.16 + uHit * 0.42, alpha);
       }
@@ -48,7 +48,7 @@ function makeCargoShield(craft: Group) {
   craft.add(field);
 
   const ringMaterial = new MeshBasicMaterial({
-    color: 0xffce4f, transparent: true, opacity: .62,
+    color: 0xffce4f, transparent: true, opacity: .31,
     depthWrite: false, blending: AdditiveBlending
   });
   const ring = new Mesh(shieldRingGeometry, ringMaterial);

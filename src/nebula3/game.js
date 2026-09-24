@@ -81,6 +81,7 @@
     function sound(kind, position = null) { combatAudio.play(kind, position); }
     settings.effects.addEventListener("change", () => {
       if (settings.effects.checked) wakeAudio();
+      else combatAudio.stopSiren();
     });
 
     const ui = {
@@ -453,6 +454,7 @@
       const dish = mesh(ballGeo, satelliteMetal, craft, [0, -10, 0], [6, 2, 6]);
       dish.rotation.z = .22;
       planet.add(craft);
+      craft.userData.integrity = 36;
       satellites.push(craft);
     }
 
@@ -474,7 +476,8 @@
       const equipment = createLunarMine(moon, radius);
       moons.push({ orbit, moon, radius, ...equipment,
         phase: i * 2.7, ore: 1000, cargo: 0,
-        defenseCooldown: 1 + i * .3, defenseAnnounced: false });
+        mineIntegrity: 100, defenseCooldown: 1 + i * .3,
+        defenseAnnounced: false });
     }
 
     // ============================================================
@@ -1564,6 +1567,132 @@
       }
     }
 
+    function aimSiegeRaider(drone) {
+      const target = drone.raidTarget;
+      const aim = drone.raidAim;
+      const standoff = drone.raidStandoff;
+      if (target.type === "planet") {
+        aim.copy(planet.position).addScaledVector(target.direction, 570);
+        standoff.copy(aim).addScaledVector(target.direction, 175);
+      } else if (target.type === "satellite") {
+        satellites[target.index].getWorldPosition(aim);
+        drone.raidNormal.subVectors(aim, planet.position).normalize();
+        standoff.copy(aim).addScaledVector(drone.raidNormal, 125);
+      } else {
+        const moon = moons[target.index];
+        moon.mine.getWorldPosition(aim);
+        moon.moon.getWorldPosition(drone.raidNormal);
+        drone.raidNormal.subVectors(aim, drone.raidNormal).normalize();
+        standoff.copy(aim).addScaledVector(drone.raidNormal, 145);
+      }
+    }
+
+    function startSiege() {
+      if (siegeActive) return;
+      siegeActive = true;
+      siegeElapsed = siegeDamage = 0;
+      siegeReportTimer = 0;
+      planet.updateMatrixWorld(true);
+      const targets = [
+        ...[0, 1, 2, 3].map(i => ({ type: "planet", index: i,
+          direction: new V3(Math.cos(i * 1.7), .2 + i * .08,
+            Math.sin(i * 1.7)).normalize() })),
+        ...moons.map((_, index) => ({ type: "mine", index })),
+        ...[0, 2].filter(index => satellites[index].visible)
+          .map(index => ({ type: "satellite", index }))
+      ];
+      targets.forEach((target, index) => {
+        const drone = createDrone(index % 4 === 0 ? 2 : 1);
+        drone.raidTarget = target;
+        drone.raidAim = new V3();
+        drone.raidStandoff = new V3();
+        drone.raidNormal = new V3();
+        aimSiegeRaider(drone);
+        drone.group.position.copy(drone.raidStandoff)
+          .addScaledVector(drone.raidNormal.lengthSq() > 0 ? drone.raidNormal :
+            target.direction, rand(220, 350));
+        drone.group.position.x += (index % 3 - 1) * 65;
+        drone.maxHp = drone.kind === 2 ? 48 : 34;
+        drone.hp = drone.maxHp;
+        drone.cooldown = rand(.3, 1.4);
+        siegeRaiders.push(drone);
+        drones.push(drone);
+      });
+      defenseCooldown = 0;
+      moons.forEach(moon => { moon.defenseCooldown = 0; });
+      allySpawnTimer = 0;
+      queueEvent("ALERTA VERMELHO // HORDAS ATACAM AURORA, SATÉLITES E MINAS", "alert");
+      showSiegeReport();
+      combatAudio.startSiren();
+    }
+
+    function endSiege(defended, silent = false) {
+      if (!siegeActive) return;
+      siegeActive = false;
+      combatAudio.stopSiren();
+      for (const raider of siegeRaiders) {
+        scene.remove(raider.group);
+        const index = drones.indexOf(raider);
+        if (index !== -1) drones.splice(index, 1);
+      }
+      siegeRaiders.length = 0;
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        if (bullets[i].owner === "raid") removeBullet(i);
+      }
+      ui.chancellorCall.classList.remove("siege", "visible");
+      ui.chancellorCall.setAttribute("aria-hidden", "true");
+      chancellorVisible = 0;
+      nextChancellor = reportInterval;
+      nextSiege = rand(220, 300);
+      if (silent) return;
+      if (defended) {
+        score += 1200;
+        affectCivilization({ stability: 3, trade: 1 },
+          "AURORA // DEFESA INTEGRAL CONCLUÍDA · +1200 PTS");
+      } else queueEvent(`AURORA // ATAQUE REPELIDO · ${siegeDamage} IMPACTOS · REPAROS EM ANDAMENTO`, "ally");
+    }
+
+    function updateSiege(dt) {
+      if (!siegeActive) {
+        nextSiege -= dt;
+        if (nextSiege <= 0 && camera.position.distanceToSquared(planet.position) < 3200 ** 2)
+          startSiege();
+        return;
+      }
+      siegeElapsed += dt;
+      combatAudio.startSiren();
+      if (siegeElapsed >= 42 || (siegeElapsed >= 10 &&
+        siegeRaiders.every(drone => !drone.group.visible))) {
+        endSiege(siegeRaiders.every(drone => !drone.group.visible));
+      }
+    }
+
+    function updateSiegeRaider(drone, dt) {
+      const target = drone.raidTarget;
+      if (target.type === "satellite" && !satellites[target.index].visible) {
+        drone.raidTarget = { type: "planet", direction: new V3(1, .3, 0).normalize() };
+      }
+      aimSiegeRaider(drone);
+      const p = drone.group.position;
+      drone.previous.copy(p);
+      drone.toward.subVectors(drone.raidStandoff, p);
+      const distance = drone.toward.length();
+      drone.desired.copy(drone.toward).normalize()
+        .multiplyScalar(Math.min(75, distance * 1.8));
+      drone.velocity.lerp(drone.desired, 1 - Math.exp(-2.5 * dt));
+      p.addScaledVector(drone.velocity, dt);
+      keepActorOutOfWorld(drone.group, drone.previous, drone.kind === 2 ? 7 : 5);
+      drone.group.lookAt(drone.raidAim);
+      drone.cooldown -= dt;
+      if (drone.cooldown <= 0 && p.distanceToSquared(drone.raidAim) < 550 ** 2) {
+        const direction = drone.toward.subVectors(drone.raidAim, p).normalize();
+        spawnBullet(p.clone().addScaledVector(direction, 7), direction, true,
+          "raid", 7, 210);
+        bullets[bullets.length - 1].raidTarget = drone.raidTarget;
+        drone.cooldown = rand(1.7, 2.6);
+      }
+    }
+
     for (let i = 0; i < CONFIG.drones; i++) drones.push(createDrone(i));
 
     // ============================================================
@@ -1930,8 +2059,8 @@
       shieldVisual.material.uniforms.uTime.value = time;
       shieldVisual.material.uniforms.uStrength.value = .35 + shieldFraction * .65;
       shieldVisual.material.uniforms.uHit.value = convoy.cargoShieldHit;
-      shieldVisual.ringMaterial.opacity = (.3 + Math.sin(time * 4) * .1)
-        * (.4 + shieldFraction * .6) + convoy.cargoShieldHit * .35;
+      shieldVisual.ringMaterial.opacity = ((.3 + Math.sin(time * 4) * .1)
+        * (.4 + shieldFraction * .6) + convoy.cargoShieldHit * .35) * .5;
       shieldVisual.ring.rotation.z = Math.sin(time * .4) * .06;
       if (convoy.station.destroyed || !convoy.station.group.parent) {
         finishConvoy(false);
@@ -2123,8 +2252,9 @@
       planet.updateMatrixWorld(true);
       for (const moon of moons) add(moon.moon.getWorldPosition(new V3()),
         moon.radius, moon.moon.uuid, "moon");
-      for (const satellite of satellites) add(satellite.getWorldPosition(new V3()),
-        13, satellite.uuid, "satellite");
+      for (const satellite of satellites) if (satellite.visible) {
+        add(satellite.getWorldPosition(new V3()), 13, satellite.uuid, "satellite");
+      }
       for (const body of celestialBodies) {
         add(body.group.position, body.radius, body.group.uuid, body.type);
       }
@@ -2201,10 +2331,12 @@
       const turrets = [];
       for (let i = 0; i < 3; i++) {
         const angle = i * Math.PI * 2 / 3 + moonIndex * .6;
-        const normal = new V3(Math.cos(angle), i === 1 ? .24 : -.16,
-          Math.sin(angle)).normalize();
+        const normal = i === 0 ? new V3(0, 1, 0) :
+          new V3(Math.cos(angle), i === 1 ? .24 : -.16,
+            Math.sin(angle)).normalize();
         const turret = new THREE.Group();
         turret.position.copy(normal).multiplyScalar(moon.radius * .96 + 2);
+        if (i === 0) turret.position.x += 27;
         turret.quaternion.setFromUnitVectors(UP_AXIS, normal);
         mesh(new THREE.CylinderGeometry(4.5, 6, 3, 7), darkMetal, turret, [0, 0, 0]);
         mesh(boxGeo, armor, turret, [0, 4, 0], [7, 4, 7]);
@@ -2216,6 +2348,7 @@
       return turrets;
     });
     let defenseCooldown = 1.4;
+    let stationDefenseCooldown = 0;
     let defenseVolley = 0;
     let lastDefenseTier = 2;
 
@@ -2300,7 +2433,7 @@
         }
       }
 
-      const tier = defenseTier();
+      const tier = siegeActive ? Math.max(2, defenseTier()) : defenseTier();
       if (tier !== lastDefenseTier) {
         queueEvent(tier === 0
           ? "AURORA // REDE DE DEFESA DESATIVADA: ESTABILIDADE CRÍTICA"
@@ -2321,7 +2454,7 @@
           strikeDefenseTarget(shot.target, tier, false);
           if (defenseVolley++ === 0) queueEvent(
             "AURORA // BATERIAS PLANETÁRIAS INTERCEPTAM NAVES INIMIGAS", "ally");
-          defenseCooldown = tier === 1 ? 1.15 : tier === 2 ? .58 : .4;
+          defenseCooldown = siegeActive ? .28 : tier === 1 ? 1.15 : tier === 2 ? .58 : .4;
         } else defenseCooldown = .35;
       }
       moons.forEach((moon, index) => {
@@ -2337,8 +2470,26 @@
           queueEvent(`LUA ${index + 1} // CANHÕES PROTEGEM A OPERAÇÃO DE MINERAÇÃO`, "ally");
           moon.defenseAnnounced = true;
         }
-        moon.defenseCooldown = tier === 1 ? 2.4 : tier === 2 ? 1.65 : 1.25;
+        moon.defenseCooldown = siegeActive ? .85 : tier === 1 ? 2.4 : tier === 2 ? 1.65 : 1.25;
       });
+      if (siegeActive) {
+        stationDefenseCooldown -= dt;
+        if (stationDefenseCooldown <= 0) {
+          for (const stationEntry of refuelStations) {
+            if (stationEntry.destroyed || !stationEntry.group.visible ||
+              !stationEntry.group.parent || stationEntry.supply < 1) continue;
+            const target = siegeRaiders.find(drone => drone.group.visible &&
+              drone.group.position.distanceToSquared(stationEntry.group.position) < 650 ** 2);
+            if (!target) continue;
+            fireDefenseBeam(stationEntry.group.position, target.group.position);
+            strikeDefenseTarget({ type: "drone", actor: target,
+              position: target.group.position }, 1, false);
+            stationEntry.supply = Math.max(0, stationEntry.supply - .15);
+            break;
+          }
+          stationDefenseCooldown = .7;
+        }
+      }
     }
 
     // ============================================================
@@ -2410,6 +2561,9 @@
     let nextChancellor = reportInterval, chancellorVisible = 0;
     let lastChancellorTopic = "";
     let nextSpeaker = "fluffy";
+    let nextSiege = rand(75, 105), siegeActive = false, siegeElapsed = 0;
+    let siegeReportTimer = 0, siegeDamage = 0;
+    const siegeRaiders = [];
 
     const ambientMessages = [
       "SENSORES // DESTROÇOS METÁLICOS À DERIVA",
@@ -2527,6 +2681,11 @@
     }
 
     function updateChancellor(dt) {
+      if (siegeActive) {
+        siegeReportTimer -= dt;
+        if (siegeReportTimer <= 0) showSiegeReport();
+        return;
+      }
       if (chancellorVisible > 0) {
         chancellorVisible -= dt;
         if (chancellorVisible <= 0) {
@@ -2549,6 +2708,22 @@
       chancellorVisible = 8;
       nextChancellor = reportInterval;
       nextSpeaker = general ? "fluffy" : "perrito";
+    }
+
+    function showSiegeReport() {
+      const general = nextSpeaker === "perrito";
+      ui.chancellorCall.classList.toggle("general", general);
+      ui.chancellorCall.classList.add("siege", "visible");
+      ui.chancellorSpeaker.textContent = general ? "GENERAL PERRITO // DEFESA TOTAL" :
+        "CHANCELER MR. FLUFFY // EMERGÊNCIA";
+      ui.chancellorChannel.textContent = "CANAL DE EMERGÊNCIA ▪ PRIORIDADE MÁXIMA";
+      ui.chancellorPortrait.src = general ? perritoPortrait : fluffyPortrait;
+      ui.chancellorText.textContent = general
+        ? "Todas as naves e postos de contenção: defendam o planeta, os satélites e as minas! Fogo à vontade!"
+        : "Invasão em massa! Suspendi as reuniões. Protejam Aurora e as perfuradoras; o orçamento pode esperar!";
+      ui.chancellorCall.setAttribute("aria-hidden", "false");
+      nextSpeaker = general ? "fluffy" : "perrito";
+      siegeReportTimer = 8;
     }
 
     const bullets = [];
@@ -2582,6 +2757,7 @@
       bullet.enemy = enemy;
       bullet.owner = owner;
       bullet.damage = damageValue;
+      bullet.raidTarget = null;
       bullet.life = enemy ? 4 : 2.2;
       bullet.mesh.material = enemy
         ? owner === "mothership" ? purple : pink
@@ -3075,12 +3251,48 @@
           }
         }
 
+        if (!hit && bullet.owner === "raid" && bullet.raidTarget) {
+          const target = bullet.raidTarget;
+          planet.updateMatrixWorld(true);
+          if (target.type === "planet" && segmentDistanceSquared(planet.position,
+            bullet.previous, bullet.mesh.position) < 570 ** 2) {
+            hit = true;
+            siegeDamage++;
+            civilization.stability = Math.max(0, civilization.stability - .25);
+            burst(bullet.mesh.position, 0xff624e, 16, 15);
+          } else if (target.type === "satellite") {
+            const satellite = satellites[target.index];
+            if (satellite.visible && segmentDistanceSquared(
+              satellite.getWorldPosition(radarVector), bullet.previous,
+              bullet.mesh.position) < 15 ** 2) {
+              hit = true;
+              siegeDamage++;
+              satellite.userData.integrity -= bullet.damage;
+              burst(bullet.mesh.position, 0xffa568, 24, 17);
+              if (satellite.userData.integrity <= 0) {
+                satellite.visible = false;
+                burst(radarVector, 0xff7452, 65, 35);
+                queueEvent(`AURORA // SATÉLITE ${target.index + 1} FORA DE OPERAÇÃO`, "alert");
+              }
+            }
+          } else if (target.type === "mine") {
+            const moon = moons[target.index];
+            if (segmentDistanceSquared(moon.moon.getWorldPosition(radarVector),
+              bullet.previous, bullet.mesh.position) < moon.radius ** 2) {
+              hit = true;
+              siegeDamage++;
+              moon.mineIntegrity = Math.max(0, moon.mineIntegrity - bullet.damage * 1.4);
+              civilization.economy = Math.max(0, civilization.economy - .12);
+              burst(bullet.mesh.position, 0xffa568, 19, 16);
+            }
+          }
+        }
         if (!hit) {
           planet.updateMatrixWorld(true);
           hit = moons.some(moon => segmentDistanceSquared(
             moon.moon.getWorldPosition(new V3()), bullet.previous,
             bullet.mesh.position) < moon.radius ** 2) ||
-            satellites.some(satellite => segmentDistanceSquared(
+            satellites.some(satellite => satellite.visible && segmentDistanceSquared(
               satellite.getWorldPosition(new V3()), bullet.previous,
               bullet.mesh.position) < 13 ** 2);
         }
@@ -3670,6 +3882,7 @@
       restartPending = false;
 
       wakeAudio();
+      if (siegeActive) combatAudio.startSiren();
 
       started = true;
       active = true;
@@ -3689,6 +3902,7 @@
 
     function pause() {
       active = false;
+      combatAudio.stopSiren();
       if (score > record) {
         record = score;
         settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
@@ -3799,6 +4013,7 @@
       while (defenseBeams.length) clearDefenseBeam(defenseBeams.pop());
       clearAlliedBeams();
       while (distantBattles.length) removeDistantBattle(distantBattles[0]);
+      endSiege(false, true);
       clearConvoy();
       clearRescueShip();
       rescueCooldown = 0;
@@ -3806,9 +4021,11 @@
       nextDistantBattle = rand(8, 16);
       solidImpactTimes.clear();
       defenseCooldown = 1.4;
+      stationDefenseCooldown = 0;
       defenseVolley = 0;
       lastDefenseTier = 2;
       lastSupersonicAlert = -100;
+      nextSiege = rand(75, 105);
 
       for (const key of Array.from(loadedSectors.keys())) unloadSector(key);
       destroyedWorldObjects.clear();
@@ -3822,10 +4039,15 @@
         moon.orbit.rotation.y = [.4, 2.5, 4.3][index];
         moon.ore = 1000;
         moon.cargo = 0;
+        moon.mineIntegrity = 100;
         moon.defenseCooldown = 1 + index * .3;
         moon.defenseAnnounced = false;
       });
       miningReadyNotified = false;
+      satellites.forEach(satellite => {
+        satellite.visible = true;
+        satellite.userData.integrity = 36;
+      });
       atmosphere.position.copy(planet.position);
       station.position.set(0, 15, -540);
       station.visible = true;
@@ -3862,7 +4084,7 @@
       chancellorVisible = 0;
       lastChancellorTopic = "";
       nextSpeaker = "fluffy";
-      ui.chancellorCall.classList.remove("visible");
+      ui.chancellorCall.classList.remove("visible", "siege");
       ui.chancellorCall.setAttribute("aria-hidden", "true");
       queueEvent("COMANDO // CANAL TÁTICO CONECTADO");
       refreshSectors(true);
@@ -4221,6 +4443,10 @@
 
     function updateDrones(dt) {
       for (const drone of drones) {
+        if (drone.raidTarget) {
+          if (drone.group.visible) updateSiegeRaider(drone, dt);
+          continue;
+        }
         if (!drone.group.visible) {
           drone.respawn -= dt;
           if (drone.respawn <= 0) placeDrone(drone);
@@ -4315,9 +4541,11 @@
         const ally = ready[i];
         const column = ally.index % 5 - 2;
         const row = Math.floor(ally.index / 5);
-        const local = new V3(column * 115, 18 + row * 95, 140 + row * 110 + i * 3)
-          .applyQuaternion(camera.quaternion)
-          .add(camera.position);
+        const local = siegeActive
+          ? new V3(column * 115, 40 + row * 95, 780 + row * 90 + i * 3)
+            .add(planet.position)
+          : new V3(column * 115, 18 + row * 95, 140 + row * 110 + i * 3)
+            .applyQuaternion(camera.quaternion).add(camera.position);
 
         ally.group.position.copy(local);
         ally.group.quaternion.copy(camera.quaternion);
@@ -4343,12 +4571,12 @@
       queueEvent(`COMANDO // ${["INTERCEPTADOR", "FRAGATA", "CRUZADOR"][ally.tier]} ${ally.index + 1} ABATIDO · REFORÇO SOLICITADO`, "alert");
     }
 
-    function getClosestDrone(position) {
+    function getClosestDrone(position, raidOnly = false) {
       let selected = null;
       let bestDistance = Infinity;
 
       for (const drone of drones) {
-        if (!drone.group.visible) continue;
+        if (!drone.group.visible || (raidOnly && !drone.raidTarget)) continue;
         const distance = drone.group.position.distanceToSquared(position);
         if (distance < bestDistance) {
           bestDistance = distance;
@@ -4412,14 +4640,17 @@
       for (const ally of allies) {
         if (!ally.active) continue;
 
-        const droneTarget = getClosestDrone(ally.group.position);
-        let targetPosition = mothership.visible
+        const droneTarget = siegeActive
+          ? getClosestDrone(ally.group.position, true) || getClosestDrone(ally.group.position)
+          : getClosestDrone(ally.group.position);
+        let targetPosition = siegeActive && droneTarget?.raidTarget
+          ? droneTarget.group.position : mothership.visible
           ? mothership.group.position
           : boss.visible ? boss.group.position
           : droneTarget?.group.position;
         const attackTarget = targetPosition;
 
-        if (ally.group.position.distanceToSquared(camera.position) > 700 * 700) {
+        if (!siegeActive && ally.group.position.distanceToSquared(camera.position) > 700 * 700) {
           targetPosition = null;
         }
 
@@ -4427,8 +4658,11 @@
           const escort = new V3(
             (ally.index % 5 - 2) * 105,
             20 + Math.floor(ally.index / 5) * 90 + Math.sin(time + ally.phase) * 8,
-            150 + Math.floor(ally.index / 5) * 125
-          ).applyQuaternion(camera.quaternion).add(camera.position);
+            siegeActive ? 780 + Math.floor(ally.index / 5) * 125 :
+              150 + Math.floor(ally.index / 5) * 125
+          );
+          if (siegeActive) escort.add(planet.position);
+          else escort.applyQuaternion(camera.quaternion).add(camera.position);
           temp.subVectors(escort, ally.group.position);
           ally.velocity.lerp(temp.clampLength(0, 230), 1 - Math.exp(-2.4 * dt));
         } else {
@@ -4995,7 +5229,9 @@
       }
       if (active) {
         moons.forEach((moon, index) => {
-          const extracted = Math.min(moon.ore, dt * [.22, .17, .12][index]);
+          moon.mineIntegrity = Math.min(100, moon.mineIntegrity + dt * .22);
+          const extracted = Math.min(moon.ore,
+            dt * [.22, .17, .12][index] * (.15 + .85 * moon.mineIntegrity / 100));
           moon.ore -= extracted;
           moon.cargo = Math.min(60, moon.cargo + extracted);
         });
@@ -5148,6 +5384,7 @@
         updateWorldObjects(dt);
         updateRescueShip(dt);
         updateConvoy(dt);
+        updateSiege(dt);
         updateDrones(dt);
         updateGuidedMissiles(dt);
         updateAllies(dt);

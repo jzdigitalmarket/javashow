@@ -278,6 +278,34 @@
     #chancellorCall.general { border-color: #7fe5d799; }
     #chancellorCall.general .chancellor-content strong { color: #9bf4db; }
 
+    #chancellorCall.siege {
+      width: min(420px, calc(100vw - 24px));
+      min-height: 150px;
+      padding-top: 28px;
+      border: 2px solid #ff4242;
+      background: linear-gradient(135deg, #32090eef, #190b17f2);
+      animation: siegeAlarm .78s ease-in-out infinite alternate;
+    }
+    #chancellorCall.siege::before {
+      content: "⚠ ALERTA VERMELHO · DEFESA INTEGRAL ⚠";
+      position: absolute;
+      top: 7px;
+      left: 12px;
+      right: 8px;
+      color: #ffdfd0;
+      font: 800 11px/1.2 ui-monospace, monospace;
+      letter-spacing: .08em;
+    }
+    #chancellorCall.siege .chancellor-content strong { color: #ff9a8c; }
+    #chancellorCall.siege .chancellor-content small { color: #ffb1a3; }
+    @keyframes siegeAlarm {
+      from { border-color: #ff4242; box-shadow: 0 0 8px #ff343477, inset 0 0 8px #ff343422; }
+      to { border-color: #ffaaa0; box-shadow: 0 0 32px #ff3434bb, inset 0 0 20px #ff343455; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #chancellorCall.siege { animation: none; }
+    }
+
     #chancellorCall::after {
       content: "";
       position: absolute;
