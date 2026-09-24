@@ -71,7 +71,8 @@
     const ui = {
       overlay: $("overlay"), title: $("title"), description: $("description"),
       start: $("start"), status: $("status"), message: $("message"),
-      eventFeed: $("eventFeed"),
+      eventFeed: $("eventFeed"), chancellorCall: $("chancellorCall"),
+      chancellorText: $("chancellorText"),
       civTitle: $("civTitle"), civPopulation: $("civPopulation"),
       civGovernment: $("civGovernment"), civEconomy: $("civEconomy"),
       civTrade: $("civTrade"), civCulture: $("civCulture"),
@@ -2301,6 +2302,8 @@
     let warpTimer = 0, warpVisual = 0, damage = 0, hitTimer = 0;
     let fireCooldown = 0, sinceDamage = 10, overheated = false;
     let eventTimer = 4, nextAmbientMessage = rand(5, 8);
+    let nextChancellor = rand(18, 25), chancellorVisible = 0;
+    let lastChancellorTopic = "";
 
     const ambientMessages = [
       "SENSORES // DESTROÇOS METÁLICOS À DERIVA",
@@ -2344,6 +2347,70 @@
             : ambientMessages[Math.floor(Math.random() * ambientMessages.length)];
 
       queueEvent(contextual, mothership.visible || boss.visible || nearbyEnemies >= 5 ? "alert" : "");
+    }
+
+    function chancellorReport() {
+      const stability = Math.round(civilization.stability);
+      const economy = Math.round(civilization.economy);
+      const trade = Math.round(civilization.trade);
+      const reports = [
+        { topic: "government", lines: [
+          `O governo agora é ${civilization.government.toLowerCase()}. Mudamos o nome; a papelada ficou.`,
+          `Aurora tem ${civilization.population.toFixed(2).replace(".", ",")} bilhões de cidadãos. Todos querem uma reunião comigo.`,
+          `Estamos na fase ${civilization.era.toLowerCase()}. O orçamento continua na fase experimental.`
+        ] },
+        { topic: "culture", lines: [
+          `Cultura em ${Math.round(civilization.culture)} pontos. Os artistas pediram menos invasões no horário da estreia.`,
+          `Tecnologia em ${Math.round(civilization.technology)} pontos. A impressora do conselho segue sem funcionar.`
+        ] }
+      ];
+      if (stability < 45) reports.push({ topic: "stability", lines: [
+        `Estabilidade em ${stability}%. O conselho chama isso de uma emocionante oportunidade de gestão.`,
+        `Com ${stability}% de estabilidade, o prédio do governo ainda está de pé. Por enquanto.`
+      ] });
+      if (mothership.visible || boss.visible) reports.push({ topic: "battle", lines: [
+        `Temos ${mothership.visible ? "uma nave-mãe" : "um chefão"} no setor. A comissão de boas-vindas pediu escudos.`,
+        `O inimigo entrou no espaço aéreo. A nota de protesto saiu impressa em papel reforçado.`
+      ] });
+      if (convoy) reports.push({ topic: "convoy", lines: [
+        `O cargueiro traz ${Math.floor(convoy.tons)} toneladas. Se chegar, foi planejamento; se cair, foi auditoria.`,
+        `A escolta lunar está a caminho. Favor não converter nossa logística em fogos de artifício.`
+      ] });
+      const lowestSupply = refuelStations.filter(entry => !entry.destroyed)
+        .reduce((min, entry) => Math.min(min, entry.supply), 100);
+      if (lowestSupply < 26) reports.push({ topic: "supply", lines: [
+        `Uma estação está com ${Math.ceil(lowestSupply)}% de reserva. A reunião sobre isso consumiu o resto do café.`,
+        `O minério lunar precisa chegar. As estações não funcionam apenas com otimismo ministerial.`
+      ] });
+      if (economy < 30 || trade < 20) reports.push({ topic: "economy", lines: [
+        `Economia ${economy}, comércio ${trade}. O ministro chamou de crescimento discreto. Bem discreto.`,
+        `O comércio está em ${trade}. Proibimos a palavra crise em três memorandos; não resolveu.`
+      ] });
+      if (moons.some(moon => moon.cargo >= 8)) reports.push({ topic: "mining", lines: [
+        `As minas lunares encheram os depósitos. Agora só falta a parte simples: atravessar uma guerra.`,
+        `As perfuradoras trabalham sem parar. O departamento de transporte, com sorte, também.`
+      ] });
+      const choices = reports.filter(report => report.topic !== lastChancellorTopic);
+      const selected = choices[Math.floor(Math.random() * choices.length)] || reports[0];
+      lastChancellorTopic = selected.topic;
+      return selected.lines[Math.floor(Math.random() * selected.lines.length)];
+    }
+
+    function updateChancellor(dt) {
+      if (chancellorVisible > 0) {
+        chancellorVisible -= dt;
+        if (chancellorVisible <= 0) {
+          ui.chancellorCall.classList.remove("visible");
+          ui.chancellorCall.setAttribute("aria-hidden", "true");
+        }
+      }
+      nextChancellor -= dt;
+      if (nextChancellor > 0 || eventTimer > 1.5 || chancellorVisible > 0) return;
+      ui.chancellorText.textContent = chancellorReport();
+      ui.chancellorCall.setAttribute("aria-hidden", "false");
+      ui.chancellorCall.classList.add("visible");
+      chancellorVisible = 8;
+      nextChancellor = rand(48, 72);
     }
 
     const bullets = [];
@@ -3530,6 +3597,11 @@
       resetCivilization();
       eventTimer = 4;
       nextAmbientMessage = rand(5, 8);
+      nextChancellor = rand(18, 25);
+      chancellorVisible = 0;
+      lastChancellorTopic = "";
+      ui.chancellorCall.classList.remove("visible");
+      ui.chancellorCall.setAttribute("aria-hidden", "true");
       queueEvent("COMANDO // CANAL TÁTICO CONECTADO");
       refreshSectors(true);
     }
@@ -4731,6 +4803,7 @@
         updateEnvironment(dt);
         updateCivilization(dt);
         updateMissionEvents(dt);
+        updateChancellor(dt);
       } else if (!started) {
         // Cena de apresentação animada sem iniciar o combate.
         time += dt;
