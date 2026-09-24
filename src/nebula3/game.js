@@ -101,7 +101,7 @@
       fuel: $("fuelBar"), bomb: $("bombBar"),
       shieldValue: $("shieldValue"), heatValue: $("heatValue"),
       warpValue: $("warpValue"), fuelValue: $("fuelValue"), bombValue: $("bombValue"),
-      reticle: $("reticle"), target: $("target")
+      reticle: $("reticle"), target: $("target"), convoyTag: $("convoyTag")
     };
     settings.difficulty.addEventListener("change", () => {
       if (started) ui.status.textContent =
@@ -1849,6 +1849,8 @@
     function clearConvoy() {
       if (!convoy) return;
       scene.remove(convoy.group);
+      convoy.cargoShield.material.dispose();
+      convoy.cargoShield.ringMaterial.dispose();
       convoy = null;
     }
 
@@ -1900,7 +1902,8 @@
           moon.cargo -= tons;
           convoy = { ...visual, destination, station: stationEntry, tons,
             velocity: destination.clone().sub(start).normalize().multiplyScalar(45),
-            age: 0 };
+            age: 0, cargoShieldHp: 32, cargoShieldMax: 32,
+            cargoShieldDelay: 0, cargoShieldHit: 0 };
           queueEvent(`MINERAÇÃO // LUA ${index + 1}: ${Math.floor(tons)} T CARREGADAS · ESCOLTE O CARGUEIRO`, "ally");
           return true;
         }
@@ -1915,6 +1918,21 @@
         return;
       }
       convoy.age += dt;
+      convoy.cargoShieldDelay = Math.max(0, convoy.cargoShieldDelay - dt);
+      convoy.cargoShieldHit = Math.max(0, convoy.cargoShieldHit - dt * 2.5);
+      if (convoy.cargoShieldDelay === 0 && convoy.cargoShieldHp < convoy.cargoShieldMax) {
+        convoy.cargoShieldHp = Math.min(convoy.cargoShieldMax,
+          convoy.cargoShieldHp + dt * 2.5);
+      }
+      const shieldVisual = convoy.cargoShield;
+      const shieldFraction = convoy.cargoShieldHp / convoy.cargoShieldMax;
+      shieldVisual.field.visible = shieldVisual.ring.visible = shieldFraction > 0;
+      shieldVisual.material.uniforms.uTime.value = time;
+      shieldVisual.material.uniforms.uStrength.value = .35 + shieldFraction * .65;
+      shieldVisual.material.uniforms.uHit.value = convoy.cargoShieldHit;
+      shieldVisual.ringMaterial.opacity = (.3 + Math.sin(time * 4) * .1)
+        * (.4 + shieldFraction * .6) + convoy.cargoShieldHit * .35;
+      shieldVisual.ring.rotation.z = Math.sin(time * .4) * .06;
       if (convoy.station.destroyed || !convoy.station.group.parent) {
         finishConvoy(false);
         return;
@@ -2904,7 +2922,21 @@
 
           if (!hit && convoy) {
             convoy.group.updateMatrixWorld(true);
+            const cargoShip = convoy.ships[0];
+            if (cargoShip.alive && convoy.cargoShieldHp > 0) {
+              const cargoPosition = cargoShip.group.getWorldPosition(radarVector);
+              if (segmentDistanceSquared(cargoPosition, bullet.previous,
+                bullet.mesh.position) < 23 ** 2) {
+                convoy.cargoShieldHp = Math.max(0, convoy.cargoShieldHp - bullet.damage);
+                convoy.cargoShieldDelay = 7;
+                convoy.cargoShieldHit = 1;
+                burst(bullet.mesh.position, 0xffd765, 13, 10);
+                sound("shield", cargoPosition);
+                hit = true;
+              }
+            }
             for (const ship of convoy.ships) {
+              if (hit) break;
               if (!ship.alive) continue;
               const position = ship.group.getWorldPosition(new V3());
               if (segmentDistanceSquared(position, bullet.previous,
@@ -4631,6 +4663,7 @@
     const inverseQuaternion = new THREE.Quaternion();
     const radarVector = new V3();
     const projected = new V3();
+    const convoyPosition = new V3();
     let lastRadarUpdate = -Infinity;
 
     function updateHUD() {
@@ -4661,6 +4694,20 @@
         ? `MÍSSIL: RECARGA ${missileCooldown.toFixed(1)}S`
         : missileTarget ? "MÍSSIL: ALVO FIXADO" : "MÍSSIL: BUSCANDO";
       updateCivilizationHUD();
+
+      if (active && convoy && convoy.ships[0].alive) {
+        convoy.ships[0].group.getWorldPosition(convoyPosition);
+        const distance = camera.position.distanceTo(convoyPosition);
+        projected.copy(convoyPosition).project(camera);
+        const visible = projected.z > -1 && projected.z < 1 &&
+          Math.abs(projected.x) < .88 && Math.abs(projected.y) < .76;
+        ui.convoyTag.hidden = !visible;
+        if (visible) {
+          ui.convoyTag.style.left = `${(projected.x * .5 + .5) * innerWidth}px`;
+          ui.convoyTag.style.top = `${(-projected.y * .5 + .5) * innerHeight}px`;
+          ui.convoyTag.textContent = `◆ MINÉRIO LUNAR · ${Math.round(distance)} M · ESCUDO ${Math.ceil(convoy.cargoShieldHp / convoy.cargoShieldMax * 100)}%`;
+        }
+      } else ui.convoyTag.hidden = true;
 
       ui.reticle.classList.toggle("hit", hitTimer > 0);
 
@@ -4870,6 +4917,11 @@
         let cy = radarVector.z * .42;
         const range = Math.hypot(cx, cy);
         if (range > 106) { cx *= 106 / range; cy *= 106 / range; }
+        radar.strokeStyle = convoy.cargoShieldHp > 0 ? "#ffd24a" : "#ff8055";
+        radar.lineWidth = 2;
+        radar.beginPath();
+        radar.arc(120 + cx, 120 + cy, 9 + Math.sin(time * 4) * 1.5, 0, Math.PI * 2);
+        radar.stroke();
         radar.fillStyle = "#ffe0a0";
         radar.fillRect(115 + cx, 115 + cy, 10, 10);
         radar.fillStyle = "#123b43";
