@@ -119,6 +119,8 @@
       box-shadow: 0 0 25px #ff7648;
     }
 
+    #reticle.locked { border-color: #ffbc76; box-shadow: 0 0 14px #ff9e5277; }
+
     #target {
       position: absolute;
       width: 64px;
@@ -691,6 +693,8 @@
       background: #46152be8;
     }
 
+    #touchMissile { border-color: #ffc58a; color: #ffe0b5; }
+
     #touchHelp {
       display: none;
     }
@@ -815,6 +819,15 @@
 
       body.touch-ui .touch-actions {
         bottom: max(18px, env(safe-area-inset-bottom));
+      }
+    }
+
+    @media (max-width: 700px) {
+      body.touch-ui .touch-actions { width: calc(100vw - 20px); gap: 4px; }
+      body.touch-ui .touch-actions button {
+        flex: 0 0 calc((100% - 28px) / 8);
+        width: calc((100% - 28px) / 8);
+        font-size: 8px;
       }
     }
 
@@ -1198,6 +1211,7 @@
         <div id="score">000000 PTS</div>
         <div id="speed">000 M/S</div>
         <div id="sector">SETOR FANTASMA</div>
+        <div id="missileValue">MÍSSIL: BUSCANDO</div>
       </div>
     </div>
 
@@ -1223,7 +1237,7 @@
         <div class="track"><div id="fuelBar" class="fill"></div></div>
       </div>
       <div class="meter">
-        <div class="label"><span>BOMBA / B / RMB</span><span id="bombValue">2/2</span></div>
+        <div class="label"><span>BOMBA / B</span><span id="bombValue">2/2</span></div>
         <div class="track"><div id="bombBar" class="fill"></div></div>
       </div>
     </div>
@@ -1235,7 +1249,7 @@
 
     <div id="hint">
       WASD · ESPAÇO / CTRL · SHIFT TURBO<br>
-      MOUSE / SETAS MIRAR · J/ESQUERDO ATIRAR · B/DIREITO BOMBA · V VISÃO · F SALTO · P PAUSA
+      MOUSE / SETAS MIRAR · J/ESQUERDO ATIRAR · DIREITO MÍSSIL · B BOMBA · V VISÃO · F SALTO · P PAUSA
     </div>
 
     <div id="eventFeed" role="status" aria-live="polite">
@@ -1305,17 +1319,17 @@
               <div id="desktopHelp">
                 <div class="control-row"><span>MOVER / MIRAR</span><strong>WASD <i>+</i> MOUSE OU SETAS</strong></div>
                 <div class="control-row"><span>SUBIR / DESCER</span><strong>ESPAÇO <i>/</i> CTRL</strong></div>
-                <div class="control-row"><span>ATIRAR / BOMBA</span><strong>CLIQUE ESQUERDO OU J <i>/</i> DIREITO OU B</strong></div>
+                <div class="control-row"><span>TIRO / MÍSSIL / BOMBA</span><strong>ESQUERDO OU J <i>/</i> DIREITO <i>/</i> B</strong></div>
                 <div class="control-row"><span>TURBO / SALTO</span><strong>SHIFT <i>/</i> F</strong></div>
                 <div class="control-row"><span>VISÃO / MENU</span><strong>V <i>/</i> P</strong></div>
                 <details class="controller-guide">
                   <summary>VER CONTROLES DO JOYPAD XBOX E REINÍCIO</summary>
-                  <p>Analógico esquerdo: mirar · direito: mover · RT: avançar · LT: turbo · A ou RB: atirar · B: bomba · X: descer · Y: visão · LB: salto · MENU: pausa · VIEW: reiniciar.</p>
+                  <p>Analógico esquerdo: mirar · direito: mover · RT: avançar · LT: turbo · A ou RB: atirar · R3: míssil · B: bomba · X: descer · Y: visão · LB: salto · MENU: pausa · VIEW: reiniciar.</p>
                 </details>
               </div>
               <div id="touchHelp">
                 <div class="control-row"><span>MOVER / MIRAR</span><strong>DIRECIONAL <i>/</i> ARRASTE À DIREITA</strong></div>
-                <div class="control-row"><span>COMBATE</span><strong>TIRO <i>/</i> BOMBA <i>/</i> TURBO</strong></div>
+                <div class="control-row"><span>COMBATE</span><strong>TIRO <i>/</i> MÍSSIL <i>/</i> BOMBA <i>/</i> TURBO</strong></div>
                 <div class="control-row"><span>NAVEGAR</span><strong>SUBIR <i>/</i> DESCER <i>/</i> SALTO</strong></div>
                 <div class="control-row"><span>VISÃO / MENU</span><strong>VISÃO <i>/</i> PAUSA</strong></div>
               </div>
@@ -1456,6 +1470,10 @@
 
       <button id="touchBomb" type="button" aria-label="Lançar bomba de emergência">
         BOMBA
+      </button>
+
+      <button id="touchMissile" type="button" aria-label="Lançar míssil teleguiado">
+        MÍSSIL
       </button>
 
       <button id="touchView" type="button" aria-label="Alternar primeira e terceira pessoa">

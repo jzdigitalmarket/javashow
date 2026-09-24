@@ -5,6 +5,7 @@
     import { createCapitalShip } from "./capitalShip.ts";
     import { createCivilianConvoy } from "./convoy.ts";
     import { createRescueShip } from "./rescueShip.ts";
+    import { createGuidedMissile, steerGuidedMissile } from "./guidedMissile.ts";
     import fluffyPortrait from "./chancellor.webp";
     import perritoPortrait from "./general-perrito.webp";
     import { createLunarMine } from "./lunarMine.ts";
@@ -84,6 +85,7 @@
       civTrade: $("civTrade"), civCulture: $("civCulture"),
       civTechnology: $("civTechnology"), civStability: $("civStability"),
       score: $("score"), speed: $("speed"), sector: $("sector"),
+      missileValue: $("missileValue"),
       shield: $("shieldBar"), heat: $("heatBar"), warp: $("warpBar"),
       fuel: $("fuelBar"), bomb: $("bombBar"),
       shieldValue: $("shieldValue"), heatValue: $("heatValue"),
@@ -1086,6 +1088,7 @@
       }
       for (const body of celestialBodies) body.group.position.sub(shift);
       for (const bomb of bombs) bomb.mesh.position.sub(shift);
+      for (const missile of guidedMissiles) missile.group.position.sub(shift);
       for (const explosion of stationExplosions) {
         for (const shock of explosion.shocks) shock.mesh.position.sub(shift);
         for (const fragment of explosion.debris) fragment.mesh.position.sub(shift);
@@ -1563,6 +1566,7 @@
       local.applyQuaternion(camera.quaternion).add(camera.position);
       drone.group.position.copy(local);
       drone.group.visible = true;
+      drone.spawnSerial = (drone.spawnSerial || 0) + 1;
       drone.hp = drone.maxHp;
       drone.cooldown = rand(1.5, 4);
       drone.respawn = 0;
@@ -2589,6 +2593,101 @@
       bullets.push(bullet);
     }
 
+    // Armamento de interceptação: exclusivamente contra naves supersônicas.
+    const guidedMissiles = [];
+    let missileCooldown = 0;
+    let missileNoticeCooldown = 0;
+
+    function findMissileTarget() {
+      camera.getWorldDirection(forward);
+      let selected = null;
+      let best = -Infinity;
+      for (const drone of drones) {
+        if (!drone.group.visible || drone.kind !== 3) continue;
+        const toTarget = drone.group.position.clone().sub(camera.position);
+        const distance = toTarget.length();
+        if (distance > 900 || distance < 12) continue;
+        const alignment = forward.dot(toTarget) / distance;
+        if (alignment < .94) continue;
+        if (collectSolids(camera.position, drone.group.position, 2).some(solid =>
+          segmentDistanceSquared(solid.center, camera.position,
+            drone.group.position) < (solid.radius + 2) ** 2)) continue;
+        const rating = alignment - distance * .00005;
+        if (rating > best) { best = rating; selected = drone; }
+      }
+      return selected;
+    }
+
+    function launchGuidedMissile() {
+      if (!active || warpTimer > 0 || missileCooldown > 0 ||
+        guidedMissiles.length >= 2) return false;
+      const target = findMissileTarget();
+      if (!target) {
+        if (missileNoticeCooldown <= 0) {
+          queueEvent("MÍSSIL // MIRE EM UMA NAVE SUPERSÔNICA PARA FIXAR O ALVO");
+          missileNoticeCooldown = 3;
+        }
+        return false;
+      }
+      camera.getWorldDirection(forward);
+      const group = createGuidedMissile();
+      const side = guidedMissiles.length % 2 ? -1 : 1;
+      group.position.copy(new V3(side * 2.2, -1.2, -5.5)
+        .applyQuaternion(camera.quaternion).add(camera.position));
+      group.quaternion.setFromUnitVectors(UP_AXIS, forward);
+      scene.add(group);
+      guidedMissiles.push({ group, direction: forward.clone(), speed: 185,
+        target, spawnSerial: target.spawnSerial, life: 5.5 });
+      missileCooldown = 2.8;
+      sound("shot");
+      queueEvent("MÍSSIL // TRAVA CONFIRMADA · INTERCEPTANDO NAVE SUPERSÔNICA", "ally");
+      return true;
+    }
+
+    function updateGuidedMissiles(dt) {
+      missileCooldown = Math.max(0, missileCooldown - dt);
+      missileNoticeCooldown = Math.max(0, missileNoticeCooldown - dt);
+      for (let i = guidedMissiles.length - 1; i >= 0; i--) {
+        const missile = guidedMissiles[i];
+        missile.life -= dt;
+        const previous = missile.group.position.clone();
+        const target = missile.target;
+        const tracking = target.group.visible && target.kind === 3 &&
+          target.spawnSerial === missile.spawnSerial;
+        if (tracking) missile.direction.copy(steerGuidedMissile(
+          missile.direction, previous, target.group.position, target.velocity,
+          missile.speed, dt));
+        missile.speed = Math.min(460, missile.speed + dt * 210);
+        missile.group.position.addScaledVector(missile.direction, missile.speed * dt);
+        missile.group.quaternion.setFromUnitVectors(UP_AXIS, missile.direction);
+        const blocked = collectSolids(previous, missile.group.position, 3).some(solid =>
+          segmentDistanceSquared(solid.center, previous, missile.group.position) <
+            (solid.radius + 3) ** 2);
+        const hit = tracking && !blocked && segmentDistanceSquared(
+          target.group.position, previous, missile.group.position) < 12 ** 2;
+        if (hit) {
+          target.hp -= 4;
+          hitTimer = .2;
+          burst(target.group.position, 0xffb577, 85, 35);
+          burst(target.group.position, 0x6de9e1, 40, 25);
+          sound("blast", target.group.position);
+          if (target.hp <= 0) {
+            target.group.visible = false;
+            target.respawn = rand(3, 5.5);
+            score += 150;
+            queueEvent("MÍSSIL // NAVE SUPERSÔNICA DESTRUÍDA · +150 PTS", "ally");
+          }
+        } else if (blocked) {
+          burst(missile.group.position, 0xffaa65, 25, 16);
+          sound("hit", missile.group.position);
+        }
+        if (hit || blocked || missile.life <= 0 || !tracking) {
+          scene.remove(missile.group);
+          guidedMissiles.splice(i, 1);
+        }
+      }
+    }
+
     // ============================================================
     // BOMBA DE EMERGÊNCIA
     // ============================================================
@@ -3401,6 +3500,7 @@
     });
 
     $("touchBomb").addEventListener("click", launchBomb);
+    $("touchMissile").addEventListener("click", launchGuidedMissile);
     $("touchView").addEventListener("click", toggleView);
 
     touchControls.addEventListener("contextmenu", event => {
@@ -3470,7 +3570,7 @@
       gamepadInput.moveX = normalizeGamepadAxis(gamepad.axes[2] || 0);
       gamepadInput.moveY = normalizeGamepadAxis(gamepad.axes[3] || 0);
 
-      // Xbox padrão: A/RB atirar, B bomba, X descer, LT turbo, RT avançar.
+      // Xbox padrão: A/RB atirar, R3 míssil, B bomba, X descer, LT turbo, RT avançar.
       gamepadInput.up = false;
       gamepadInput.down = gamepadButtonPressed(gamepad, 2);
       gamepadInput.boost = gamepadButtonPressed(gamepad, 6, .12);
@@ -3480,6 +3580,7 @@
         gamepadButtonPressed(gamepad, 5);
 
       const bombPressed = gamepadButtonDownOnce(gamepad, 1);
+      const missilePressed = gamepadButtonDownOnce(gamepad, 11);
       const viewPressed = gamepadButtonDownOnce(gamepad, 3);
       const warpPressed = gamepadButtonDownOnce(gamepad, 4);
       const resetPressed = gamepadButtonDownOnce(gamepad, 8);
@@ -3502,6 +3603,7 @@
       if (!active) return;
 
       if (bombPressed) launchBomb();
+      if (missilePressed) launchGuidedMissile();
       if (viewPressed) toggleView();
 
       if (warpPressed && charge >= 100 && warpTimer <= 0 && fuel > 0) {
@@ -3635,6 +3737,8 @@
       fuel = 100;
       bombCount = CONFIG.maxBombs;
       bombCooldown = 0;
+      missileCooldown = 0;
+      missileNoticeCooldown = 0;
       bombRefillTimer = 0;
       refuelActive = false;
       nearbyStationSupply = null;
@@ -3664,6 +3768,7 @@
         scene.remove(bombs[bombs.length - 1].mesh);
         bombs.pop();
       }
+      while (guidedMissiles.length) scene.remove(guidedMissiles.pop().group);
       while (stationExplosions.length) disposeStationExplosion(stationExplosions.pop());
       while (impacts.length) clearImpact(impacts.pop());
       while (defenseBeams.length) clearDefenseBeam(defenseBeams.pop());
@@ -3809,7 +3914,7 @@
 
       if (event.button === 2) {
         event.preventDefault();
-        launchBomb();
+        launchGuidedMissile();
         return;
       }
 
@@ -4555,6 +4660,11 @@
       ui.warpValue.textContent = `${Math.floor(charge)}%`;
       ui.fuelValue.textContent = `${Math.ceil(fuel)}%`;
       ui.bombValue.textContent = `${bombCount}/${CONFIG.maxBombs}`;
+      const missileTarget = active ? findMissileTarget() : null;
+      ui.reticle.classList.toggle("locked", Boolean(missileTarget));
+      ui.missileValue.textContent = missileCooldown > 0
+        ? `MÍSSIL: RECARGA ${missileCooldown.toFixed(1)}S`
+        : missileTarget ? "MÍSSIL: ALVO FIXADO" : "MÍSSIL: BUSCANDO";
       updateCivilizationHUD();
 
       ui.reticle.classList.toggle("hit", hitTimer > 0);
@@ -4699,6 +4809,16 @@
             };
           }
         }
+      }
+
+      if (missileTarget) {
+        projected.copy(missileTarget.group.position).project(camera);
+        bestTarget = {
+          x: (projected.x * .5 + .5) * innerWidth,
+          y: (-projected.y * .5 + .5) * innerHeight,
+          distance: camera.position.distanceTo(missileTarget.group.position),
+          label: missileCooldown > 0 ? "SUPERSÔNICA / RECARGA" : "SUPERSÔNICA / TRAVA MÍSSIL"
+        };
       }
 
       for (const ally of allies) {
@@ -4936,6 +5056,7 @@
         updateRescueShip(dt);
         updateConvoy(dt);
         updateDrones(dt);
+        updateGuidedMissiles(dt);
         updateAllies(dt);
         updateBoss(dt);
         updateMothership(dt);
