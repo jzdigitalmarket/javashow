@@ -2403,7 +2403,8 @@
     let warpTimer = 0, warpVisual = 0, damage = 0, hitTimer = 0;
     let fireCooldown = 0, sinceDamage = 10, overheated = false;
     let eventTimer = 4, nextAmbientMessage = rand(5, 8);
-    let nextChancellor = rand(18, 25), chancellorVisible = 0;
+    const reportInterval = 20;
+    let nextChancellor = reportInterval, chancellorVisible = 0;
     let lastChancellorTopic = "";
     let nextSpeaker = "fluffy";
 
@@ -2543,7 +2544,7 @@
       ui.chancellorText.textContent = general ? generalReport() : chancellorReport();
       ui.chancellorCall.classList.add("visible");
       chancellorVisible = 8;
-      nextChancellor = rand(48, 72);
+      nextChancellor = reportInterval;
       nextSpeaker = general ? "fluffy" : "perrito";
     }
 
@@ -3834,7 +3835,7 @@
       resetCivilization();
       eventTimer = 4;
       nextAmbientMessage = rand(5, 8);
-      nextChancellor = rand(18, 25);
+      nextChancellor = reportInterval;
       chancellorVisible = 0;
       lastChancellorTopic = "";
       nextSpeaker = "fluffy";
