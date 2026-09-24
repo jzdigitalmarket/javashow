@@ -883,6 +883,50 @@
     .edition-label { color: #8cacc2; text-align: right; }
     .edition-label span { color: #ffad77; margin: 0 5px; }
 
+    .command-dossiers {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      flex-shrink: 0;
+      background: linear-gradient(90deg, #102c3b, #0b1727 48%, #282136);
+      border-bottom: 1px solid #75dce735;
+    }
+    .command-profile {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 0;
+      margin: 0;
+      padding: 12px 30px;
+    }
+    .command-profile + .command-profile { border-left: 1px solid #75dce72d; }
+    .command-profile img {
+      flex: 0 0 124px;
+      width: 124px;
+      height: 140px;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 15px #020b18aa);
+    }
+    .command-profile figcaption { min-width: 0; }
+    .command-profile .rank {
+      display: block;
+      margin-bottom: 6px;
+      color: #83e7e9;
+      font: 700 10px ui-monospace, Consolas, monospace;
+      letter-spacing: .13em;
+    }
+    .command-profile h2 {
+      margin: 0 0 6px;
+      color: #e8fbff;
+      font: 800 19px/1.1 system-ui, sans-serif;
+    }
+    .command-profile p {
+      margin: 0;
+      color: #b9d4df;
+      font: 12px/1.45 system-ui, sans-serif;
+    }
+    .command-profile.general { flex-direction: row-reverse; text-align: right; }
+    .command-profile.general .rank { color: #ffd191; }
+
     .briefing-layout {
       display: grid;
       grid-template-columns: minmax(0, 1.03fr) minmax(0, .97fr);
@@ -1152,6 +1196,10 @@
     @media (max-width: 820px) {
       #overlay { padding: 10px; }
       #overlay .panel { height: auto; min-height: 0; overflow: visible; margin-block: auto; }
+      .command-profile { gap: 12px; padding: 10px 18px; }
+      .command-profile img { flex-basis: 100px; width: 100px; height: 114px; }
+      .command-profile h2 { font-size: 16px; }
+      .command-profile p { font-size: 11px; }
       .briefing-layout { display: block; }
       .mission-column, .mission-scroll, .systems-column { overflow: visible; }
       .mission-column { border-right: 0; border-bottom: 1px solid #72d6e23a; }
@@ -1166,6 +1214,10 @@
       .briefing-top { padding: 12px 18px; align-items: flex-start; }
       .briefing-top .eyebrow { line-height: 1.6; }
       .edition-label { display: none; }
+      .command-dossiers { grid-template-columns: 1fr; }
+      .command-profile { gap: 12px; padding: 8px 18px; }
+      .command-profile + .command-profile { border-left: 0; border-top: 1px solid #75dce72d; }
+      .command-profile img { flex-basis: 86px; width: 86px; height: 98px; }
       .mission-scroll { gap: 16px; padding: 24px 18px 20px; }
       .mission-intro h1 { font-size: clamp(42px, 11vw, 60px); }
       .mission-objectives { gap: 5px; }
@@ -1267,6 +1319,25 @@
       <div class="briefing-top">
         <div class="eyebrow"><span class="signal-dot"></span> NEXUS / 07 <span class="top-divider">//</span> COMANDO ORBITAL</div>
         <span class="edition-label">NEBULA 3 <span>•</span> OPERAÇÃO ÓRBITA FANTASMA</span>
+      </div>
+
+      <div class="command-dossiers" aria-label="Liderança de Aurora">
+        <figure class="command-profile">
+          <img src="../src/nebula3/chancellor.webp" alt="Retrato do chanceler Mr. Fluffy" width="124" height="140" />
+          <figcaption>
+            <span class="rank">GOVERNO DE AURORA</span>
+            <h2>Mr. Fluffy</h2>
+            <p>Eleito após prometer acabar com reuniões. Criou três comissões para descobrir por que elas continuam.</p>
+          </figcaption>
+        </figure>
+        <figure class="command-profile general">
+          <img src="../src/nebula3/general-perrito.webp" alt="Retrato do general Perrito" width="124" height="140" />
+          <figcaption>
+            <span class="rank">DEFESA PLANETÁRIA</span>
+            <h2>General Perrito</h2>
+            <p>Promovido após derrotar um aspirador rebelde. Hoje encara qualquer invasão como assunto pessoal.</p>
+          </figcaption>
+        </figure>
       </div>
 
       <div class="briefing-layout">
