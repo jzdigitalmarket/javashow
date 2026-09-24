@@ -1655,8 +1655,7 @@
     function updateSiege(dt) {
       if (!siegeActive) {
         nextSiege -= dt;
-        if (nextSiege <= 0 && camera.position.distanceToSquared(planet.position) < 3200 ** 2)
-          startSiege();
+        if (nextSiege <= 0) startSiege();
         return;
       }
       siegeElapsed += dt;
