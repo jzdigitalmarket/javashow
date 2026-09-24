@@ -4,6 +4,7 @@
     import { upgradeShipVisuals, upgradeBossVisual } from "./shipModel.ts";
     import { createCapitalShip } from "./capitalShip.ts";
     import { createCivilianConvoy } from "./convoy.ts";
+    import { createLunarMine } from "./lunarMine.ts";
     import { segmentDistanceSquared } from "./collision.ts";
     import { moveAgainstSolids } from "./solidCollision.ts";
 
@@ -431,15 +432,12 @@
       satellites.push(craft);
     }
 
-    // Três luas mineradas, com escavadeiras e transporte em ciclos contínuos.
+    // Três luas mineradas; a produção só chega à colônia por cargueiro.
     const moonRock = new THREE.MeshStandardMaterial({
       color: 0x888999, roughness: .92, metalness: .08, flatShading: true
     });
-    const oreMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd4a060, emissive: 0x7b3e0e, emissiveIntensity: .45,
-      roughness: .55, metalness: .4
-    });
     const moons = [];
+    let miningReadyNotified = false;
     for (let i = 0; i < 3; i++) {
       const orbit = new THREE.Group();
       orbit.rotation.set([.16, -.22, .31][i], [.4, 2.5, 4.3][i], 0);
@@ -449,31 +447,10 @@
       moon.position.set([1090, 1470, 1840][i], [-70, 95, -125][i], 0);
       orbit.add(moon);
       mesh(ballGeo, moonRock, moon, [0, 0, 0], [radius, radius * .94, radius]);
-      const mine = new THREE.Group();
-      mine.position.set(0, radius * .94 + 3, 0);
-      moon.add(mine);
-      mesh(boxGeo, metal, mine, [0, 3, 0], [20, 7, 16]);
-      mesh(boxGeo, oreMaterial, mine, [-10, 7, 0], [7, 9, 10]);
-      mesh(boxGeo, metal, mine, [13, 12, 0], [3, 23, 3]);
-      mesh(boxGeo, cyan, mine, [13, 24, 0], [4, 2, 4]);
-      const drillGlow = mesh(boxGeo, oreMaterial, mine, [24, -6, 0], [2, 8, 2]);
-      for (const side of [-1, 1]) {
-        mesh(ballGeo, oreMaterial, moon,
-          [side * radius * .46, radius * .83, side * radius * .25], [4, 3, 4]);
-      }
-      const extractor = new THREE.Group();
-      extractor.position.set(24, 8, 0);
-      mesh(boxGeo, darkMetal, extractor, [0, 0, 0], [12, 5, 7]);
-      mesh(boxGeo, oreMaterial, extractor, [5, -5, 0], [3, 12, 3]);
-      mine.add(extractor);
-      const hauler = new THREE.Group();
-      mesh(boxGeo, satelliteMetal, hauler, [0, 0, 0], [10, 4, 13]);
-      mesh(boxGeo, oreMaterial, hauler, [0, 4, 1], [6, 4, 7]);
-      moon.add(hauler);
-      moons.push({ orbit, moon, radius, extractor, drillGlow, hauler, mine,
+      const equipment = createLunarMine(moon, radius);
+      moons.push({ orbit, moon, radius, ...equipment,
         phase: i * 2.7, ore: 1000, cargo: 0 });
     }
-    let nextMiningReport = 26;
 
     // ============================================================
     // CIVILIZAÇÃO PLANETÁRIA: COMÉRCIO, POLÍTICA E CULTURA
@@ -796,6 +773,7 @@
 
     const worldAsteroids = [];
     const refuelStations = [];
+    const stationSupply = new Map();
     const celestialBodies = [];
     const loadedSectors = new Map();
     const destroyedWorldObjects = new Set();
@@ -804,6 +782,7 @@
     let currentSectorKey = "";
     let currentSector = { x: 0, y: 0, z: 0 };
     let refuelActive = false;
+    let nearbyStationSupply = null;
     let bombRefillTimer = 0;
 
     // A estação original continua sendo um porto de abastecimento no sistema inicial.
@@ -815,6 +794,8 @@
       id: "S:START",
       maxHp: 90,
       hp: 90,
+      supply: 70,
+      maxSupply: 100,
       destroyed: false,
       lastWarning: 100
     };
@@ -880,6 +861,8 @@
         id,
         maxHp: 70,
         hp: 70,
+        supply: stationSupply.get(id) ?? 55,
+        maxSupply: 100,
         destroyed: false,
         lastWarning: 100
       };
@@ -1020,6 +1003,7 @@
         removeArrayEntry(worldAsteroids, asteroid);
       }
       for (const stationEntry of record.stations) {
+        stationSupply.set(stationEntry.id, stationEntry.supply);
         scene.remove(stationEntry.group);
         removeArrayEntry(refuelStations, stationEntry);
       }
@@ -1761,6 +1745,21 @@
     let convoy = null;
     let nextConvoy = rand(35, 50);
 
+    function distributeLunarOre(tons, receivingStation) {
+      const available = refuelStations.filter(entry => !entry.destroyed &&
+        entry.group.visible && entry.group.parent &&
+        entry.group.position.distanceToSquared(planet.position) < 2500 ** 2);
+      const units = tons * 5;
+      const others = available.filter(entry => entry !== receivingStation);
+      receivingStation.supply = Math.min(receivingStation.maxSupply,
+        receivingStation.supply + units * (others.length ? .6 : 1));
+      if (others.length) for (const entry of others) {
+        entry.supply = Math.min(entry.maxSupply, entry.supply + units * .4 / others.length);
+        if (!entry.starter) stationSupply.set(entry.id, entry.supply);
+      }
+      if (!receivingStation.starter) stationSupply.set(receivingStation.id, receivingStation.supply);
+    }
+
     function clearConvoy() {
       if (!convoy) return;
       scene.remove(convoy.group);
@@ -1769,40 +1768,58 @@
 
     function finishConvoy(arrived) {
       if (!convoy) return;
-      const survivors = convoy.ships.filter(ship => ship.alive).length;
-      if (arrived && survivors) {
-        score += survivors * 180;
-        affectCivilization({ economy: survivors, trade: survivors * 2, stability: survivors },
-          `AURORA // ${survivors} CARGUEIRO${survivors > 1 ? "S" : ""} CHEGARAM · +${survivors * 180} PTS`);
-      } else if (!survivors) {
+      if (arrived && convoy.ships[0].alive && !convoy.station.destroyed) {
+        const escorts = convoy.ships.slice(1).filter(ship => ship.alive).length;
+        distributeLunarOre(convoy.tons, convoy.station);
+        score += 500 + escorts * 90;
+        affectCivilization({ economy: convoy.tons * .18, trade: convoy.tons * .1,
+          stability: 1 + escorts },
+        `AURORA // ${Math.floor(convoy.tons)} T ENTREGUES · ESTAÇÕES ABASTECIDAS · +${500 + escorts * 90} PTS`);
+      } else {
         affectCivilization({ economy: -2, trade: -4, stability: -5 },
-          "AURORA // COMBOIO CIVIL PERDIDO · COMÉRCIO E ESTABILIDADE REDUZIDOS");
+          "AURORA // CARGA LUNAR PERDIDA · ESTAÇÕES SEM REPOSIÇÃO");
       }
       clearConvoy();
       nextConvoy = rand(75, 110);
     }
 
     function spawnConvoy() {
-      const height = rand(-40, 65);
-      const start = new V3(-390, height, -450)
-        .applyQuaternion(camera.quaternion).add(camera.position);
-      const destination = new V3(470, height, -560)
-        .applyQuaternion(camera.quaternion).add(camera.position);
-      if (collectSolids(start, destination, 39).some(solid =>
-        segmentDistanceSquared(solid.center, start, destination) <
-          (solid.radius + 39) ** 2)) return false;
-
-      const visual = createCivilianConvoy();
-      visual.group.position.copy(start);
-      visual.group.lookAt(destination);
-      scene.add(visual.group);
-      convoy = {
-        ...visual, destination,
-        velocity: destination.clone().sub(start).normalize().multiplyScalar(27),
-        age: 0
-      };
-      queueEvent("COMANDO // ESCOLTE 3 CARGUEIROS CIVIS ATÉ A ROTA DE SAÍDA", "ally");
-      return true;
+      planet.updateMatrixWorld(true);
+      const candidates = moons.map((moon, index) => ({ moon, index,
+        position: moon.mine.getWorldPosition(new V3()) }))
+        .filter(item => item.moon.cargo >= 8 &&
+          item.position.distanceToSquared(camera.position) < 1350 ** 2)
+        .sort((a, b) => a.position.distanceToSquared(camera.position) -
+          b.position.distanceToSquared(camera.position));
+      const stations = refuelStations.filter(entry => !entry.destroyed &&
+        entry.group.visible && entry.group.parent &&
+        entry.group.position.distanceToSquared(planet.position) < 2500 ** 2);
+      for (const { moon, index, position } of candidates) {
+        const moonCenter = moon.moon.getWorldPosition(new V3());
+        const start = position.clone().addScaledVector(
+          position.clone().sub(moonCenter).normalize(), 78);
+        for (const stationEntry of stations) {
+          const destination = stationEntry.group.position.clone().addScaledVector(
+            stationEntry.group.position.clone().sub(planet.position).normalize(),
+            stationEntry.radius + 65);
+          if (start.distanceTo(destination) > 4100 ||
+            collectSolids(start, destination, 48).some(solid =>
+              segmentDistanceSquared(solid.center, start, destination) <
+              (solid.radius + 48) ** 2)) continue;
+          const visual = createCivilianConvoy();
+          visual.group.position.copy(start);
+          visual.group.lookAt(destination);
+          scene.add(visual.group);
+          const tons = Math.min(moon.cargo, 36);
+          moon.cargo -= tons;
+          convoy = { ...visual, destination, station: stationEntry, tons,
+            velocity: destination.clone().sub(start).normalize().multiplyScalar(45),
+            age: 0 };
+          queueEvent(`MINERAÇÃO // LUA ${index + 1}: ${Math.floor(tons)} T CARREGADAS · ESCOLTE O CARGUEIRO`, "ally");
+          return true;
+        }
+      }
+      return false;
     }
 
     function updateConvoy(dt) {
@@ -1812,25 +1829,43 @@
         return;
       }
       convoy.age += dt;
+      if (convoy.station.destroyed || !convoy.station.group.parent) {
+        finishConvoy(false);
+        return;
+      }
       const remaining = convoy.group.position.distanceTo(convoy.destination);
       if (remaining <= 2) {
         finishConvoy(true);
         return;
       }
-      if (convoy.age > 55) {
+      if (convoy.age > 105) {
+        queueEvent("SENSORES // ROTA LUNAR INTERROMPIDA", "alert");
         clearConvoy();
         nextConvoy = rand(75, 110);
         return;
       }
-      if (convoy.group.position.distanceToSquared(camera.position) > 1900 ** 2) {
+      if (convoy.group.position.distanceToSquared(camera.position) > 2250 ** 2) {
         queueEvent("SENSORES // COMBOIO SAIU DO ALCANCE DE ESCOLTA", "alert");
         clearConvoy();
         nextConvoy = rand(75, 110);
         return;
       }
-      convoy.group.position.addScaledVector(convoy.velocity, Math.min(dt, remaining / 27));
+      const previous = convoy.group.position.clone();
+      convoy.group.position.addScaledVector(convoy.velocity, Math.min(dt, remaining / 45));
+      keepActorOutOfWorld(convoy.group, previous, 48);
       convoy.ships.forEach((ship, index) => {
-        ship.group.position.y = (index % 2) * 10 + Math.sin(time * 2 + index) * 1.2;
+        ship.group.position.y = (index ? 10 : 0) + Math.sin(time * 2 + index) * 1.2;
+        if (!index || !ship.alive) return;
+        ship.cooldown -= dt;
+        if (ship.cooldown > 0) return;
+        const origin = ship.group.getWorldPosition(new V3());
+        const target = drones.find(drone => drone.group.visible &&
+          drone.group.position.distanceToSquared(origin) < 280 ** 2);
+        if (target) {
+          spawnBullet(origin, target.group.position.clone().sub(origin).normalize(),
+            false, "ally", 5);
+          ship.cooldown = 1.3 + index * .18;
+        }
       });
       convoy.group.updateMatrixWorld(true);
     }
@@ -2518,7 +2553,7 @@
               if (!ship.alive) continue;
               const position = ship.group.getWorldPosition(new V3());
               if (segmentDistanceSquared(position, bullet.previous,
-                bullet.mesh.position) >= 11 ** 2) continue;
+                bullet.mesh.position) >= (ship.role === "cargo" ? 15 : 9) ** 2) continue;
               ship.hp = Math.max(0, ship.hp - bullet.damage);
               burst(position, 0xffc787, 18, 16);
               hit = true;
@@ -2527,8 +2562,10 @@
                 ship.group.visible = false;
                 sound("blast", position);
                 burst(position, 0xff9a54, 75, 36);
-                queueEvent("COMANDO // CARGUEIRO CIVIL ABATIDO", "alert");
-                if (convoy.ships.every(other => !other.alive)) finishConvoy(false);
+                queueEvent(ship.role === "cargo" ?
+                  "COMANDO // CARGUEIRO LUNAR ABATIDO" :
+                  "COMANDO // ESCOLTA DO CARGUEIRO ABATIDA", "alert");
+                if (ship.role === "cargo") finishConvoy(false);
               }
               break;
             }
@@ -3330,6 +3367,7 @@
       bombCooldown = 0;
       bombRefillTimer = 0;
       refuelActive = false;
+      nearbyStationSupply = null;
       warpTimer = 0;
       warpVisual = 0;
       damage = 0;
@@ -3372,6 +3410,7 @@
 
       for (const key of Array.from(loadedSectors.keys())) unloadSector(key);
       destroyedWorldObjects.clear();
+      stationSupply.clear();
       currentSectorKey = "";
 
       // Restaura os marcos do sistema inicial após eventual rebasing.
@@ -3382,13 +3421,14 @@
         moon.ore = 1000;
         moon.cargo = 0;
       });
-      nextMiningReport = 26;
+      miningReadyNotified = false;
       atmosphere.position.copy(planet.position);
       station.position.set(0, 15, -540);
       station.visible = true;
       if (!station.parent) scene.add(station);
       starterStation.destroyed = false;
       starterStation.hp = starterStation.maxHp;
+      starterStation.supply = 70;
       starterStation.lastWarning = 100;
 
       particleLives.fill(0);
@@ -3676,6 +3716,7 @@
 
     function updateWorldObjects(dt) {
       refuelActive = false;
+      nearbyStationSupply = null;
 
       for (let i = worldAsteroids.length - 1; i >= 0; i--) {
         const asteroid = worldAsteroids[i];
@@ -3691,7 +3732,18 @@
         const range = stationEntry.radius + 18;
         if (stationEntry.group.position.distanceToSquared(camera.position) > range * range) continue;
 
+        nearbyStationSupply = stationEntry.supply;
+        if (stationEntry.supply <= 0) continue;
         refuelActive = true;
+        const needsResources = fuel < 99 || shield < 99 || charge < 99 ||
+          heat > 1 || bombCount < CONFIG.maxBombs;
+        if (needsResources) {
+          stationEntry.supply = Math.max(0, stationEntry.supply - dt * 1.3);
+          nearbyStationSupply = stationEntry.supply;
+          if (!stationEntry.starter) stationSupply.set(stationEntry.id, stationEntry.supply);
+          if (stationEntry.supply === 0) queueEvent(
+            "ESTAÇÃO // RESERVA ESGOTADA · AGUARDANDO CARGA LUNAR", "alert");
+        }
         fuel = Math.min(100, fuel + dt * 30);
         shield = Math.min(100, shield + dt * 16);
         charge = Math.min(100, charge + dt * 32);
@@ -4229,7 +4281,8 @@
 
       ui.message.textContent =
         viewNoticeTimer > 0 ? (thirdPerson ? "VISÃO EXTERNA // 3ª PESSOA" : "VISÃO INTERNA // COCKPIT") :
-        refuelActive ? "ESTAÇÃO // REABASTECENDO SISTEMAS" :
+        refuelActive ? `ESTAÇÃO // REABASTECENDO · RESERVA ${Math.ceil(nearbyStationSupply)}%` :
+        nearbyStationSupply !== null ? "ESTAÇÃO // RESERVA ESGOTADA · ESCOLTE MINÉRIO LUNAR" :
         warpTimer > 0 ? "HIPERVELOCIDADE // CAMPO ATIVO" :
         fuel <= 8 ? "ALERTA // COMBUSTÍVEL CRÍTICO" :
         overheated ? "ARMAS SUPERAQUECIDAS" :
@@ -4390,6 +4443,21 @@
         radar.fillRect(118 + sx, 118 + sy, 4, 4);
       }
 
+      if (!convoy) {
+        planet.updateMatrixWorld(true);
+        for (const moon of moons) {
+          if (moon.cargo < 8) continue;
+          radarVector.subVectors(moon.mine.getWorldPosition(new V3()), camera.position)
+            .applyQuaternion(inverseQuaternion);
+          let lx = radarVector.x * .42;
+          let ly = radarVector.z * .42;
+          const range = Math.hypot(lx, ly);
+          if (range > 103) { lx *= 103 / range; ly *= 103 / range; }
+          radar.fillStyle = "#edb36c";
+          radar.fillRect(117 + lx, 117 + ly, 6, 6);
+        }
+      }
+
       if (convoy) {
         radarVector.subVectors(convoy.group.position, camera.position)
           .applyQuaternion(inverseQuaternion);
@@ -4447,31 +4515,25 @@
       for (const moon of moons) {
         moon.orbit.rotation.y += dt * (moon.radius > 70 ? .008 : -.005);
         moon.moon.rotation.y += dt * .015;
-        moon.extractor.rotation.z = Math.sin(time * 2.4 + moon.phase) * .24;
-        moon.drillGlow.scale.y = moon.ore > 0 ? 6 + Math.sin(time * 8 + moon.phase) * 2 : .1;
-        const travel = time * .52 + moon.phase;
-        moon.hauler.position.set(
-          Math.cos(travel) * (moon.radius + 22),
-          15 + Math.sin(time * 2 + moon.phase) * 3,
-          Math.sin(travel) * (moon.radius + 22)
-        );
-        moon.hauler.lookAt(moon.mine.getWorldPosition(new V3()));
+        moon.drill.position.y = 11 + (moon.ore > 0 ? Math.sin(time * 5 + moon.phase) * 2 : 0);
+        moon.bit.rotation.y += dt * (moon.ore > 0 ? 6 : .2);
+        moon.beltOre.forEach((piece, index) => {
+          piece.position.x = ((time * 9 + index * 6 + moon.phase * 3) % 30) - 1;
+          piece.visible = moon.ore > 0 && moon.cargo < 60;
+        });
+        moon.rover.position.set(35 + Math.sin(time * .42 + moon.phase) * 11,
+          5, 17);
+        moon.rover.rotation.y = Math.sin(time * .42 + moon.phase) > 0 ? Math.PI : 0;
       }
       if (active) {
         moons.forEach((moon, index) => {
           const extracted = Math.min(moon.ore, dt * [.22, .17, .12][index]);
           moon.ore -= extracted;
-          moon.cargo += extracted;
+          moon.cargo = Math.min(60, moon.cargo + extracted);
         });
-        nextMiningReport -= dt;
-        if (nextMiningReport <= 0) {
-          nextMiningReport = rand(48, 76);
-          const shipment = moons.reduce((sum, moon) => sum + moon.cargo, 0);
-          if (shipment > 0) {
-            affectCivilization({ economy: shipment * .025, trade: shipment * .012 },
-              `EXPLORAÇÃO // ${Math.floor(shipment)} T DE MINÉRIO LUNAR ENVIADAS À COLÔNIA`);
-            for (const moon of moons) moon.cargo = 0;
-          }
+        if (!miningReadyNotified && moons.some(moon => moon.cargo >= 8)) {
+          miningReadyNotified = true;
+          queueEvent("MINERAÇÃO // CARGA LUNAR PRONTA · APROXIME-SE DAS LUAS NO RADAR", "ally");
         }
       }
       cloudShell.rotation.y += dt * .007;
