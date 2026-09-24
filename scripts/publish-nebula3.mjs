@@ -19,7 +19,11 @@ for (const name of previous) {
 for (const name of newAssets) {
   await copyFile(resolve(generated, 'assets', name), resolve(assetDirectory, name));
 }
-await copyFile(resolve(generated, 'web/nebula3.html'), resolve(root, 'nebula3.html'));
-await copyFile(resolve(generated, 'web/nebula3-webgpu.html'), resolve(root, 'nebula3-webgpu.html'));
+// Vite emits ../assets/ because the HTML inputs live under web/ in dist.
+// The public pages are copied to the root, so their relative URLs must move too.
+for (const page of ['nebula3.html', 'nebula3-webgpu.html']) {
+  const html = await readFile(resolve(generated, 'web', page), 'utf8');
+  await writeFile(resolve(root, page), html.replaceAll('../assets/', './assets/'));
+}
 await writeFile(manifestPath, JSON.stringify(newAssets, null, 2) + '\n');
 console.log(`Nebula 3 publicado no diretório raiz com ${newAssets.length} arquivos gerados.`);

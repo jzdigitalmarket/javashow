@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   root: '.',
-  base: '/',
+  base: './',
   publicDir: false,
   build: {
     outDir: 'dist-nebula3',

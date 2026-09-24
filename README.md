@@ -11,7 +11,7 @@ npm run dev
 npm run build
 ```
 
-`npm run build` gera `nebula3.html` e `nebula3-webgpu.html` no diretório raiz. Inclua os arquivos gerados em `assets/` no commit. Edite as fontes em `web/` e `src/`, não o HTML gerado.
+`npm run build` gera `nebula3.html` e `nebula3-webgpu.html` no diretório raiz. Inclua os arquivos gerados em `assets/` no commit. Os assets são referenciados relativamente à página, permitindo publicar o jogo na raiz do Cloudflare Pages ou no subdiretório `/javashow/` do GitHub Pages. Edite as fontes em `web/` e `src/`, não o HTML gerado.
 
 O modelo da nave do jogador e aliados e o modelo da nave-chefã estão em `models/*.glb`. Para recriá-los, execute `python scripts/generate-nebula-model.py`. O jogo usa o modelo anterior como reserva caso um GLB não carregue.
 
