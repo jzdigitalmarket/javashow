@@ -208,18 +208,6 @@
       margin-top: 10px;
     }
 
-    #hint {
-      position: absolute;
-      left: 50%;
-      bottom: 24px;
-      transform: translateX(-50%);
-      width: 40%;
-      text-align: center;
-      font-size: 10px;
-      line-height: 1.8;
-      color: #82afc0;
-    }
-
     #eventFeed {
       position: absolute;
       left: 50%;
@@ -426,7 +414,6 @@
       .bottom { width: 180px; left: 15px; bottom: 15px; padding: 12px; }
       #radarBox { right: 15px; bottom: 15px; }
       #radar { width: 120px; height: 120px; }
-      #hint { display: none; }
       #eventFeed { bottom: 22px; width: 68vw; font-size: 9px; letter-spacing: 1px; }
       #chancellorCall {
         top: 80px;
@@ -759,7 +746,6 @@
       letter-spacing: 1px;
     }
 
-    body.touch-ui #hint,
     body.touch-ui #desktopHelp {
       display: none;
     }
@@ -1245,11 +1231,6 @@
     <div id="radarBox">
       SENSOR TÁTICO
       <canvas id="radar" width="240" height="240"></canvas>
-    </div>
-
-    <div id="hint">
-      WASD · ESPAÇO / CTRL · SHIFT TURBO<br>
-      MOUSE / SETAS MIRAR · J/ESQUERDO ATIRAR · DIREITO MÍSSIL · B BOMBA · V VISÃO · F SALTO · P PAUSA
     </div>
 
     <div id="eventFeed" role="status" aria-live="polite">

@@ -3287,7 +3287,8 @@
       document.body.classList.toggle("touch-ui", enabled);
 
       touchControls.hidden = !active || !enabled;
-      flightMenu.hidden = !active;
+      // O desktop usa P/Escape ou o botão MENU do controle; toque precisa do botão.
+      flightMenu.hidden = !active || !enabled;
     }
 
     touchEnabled.checked = typeof preferences.touch === "boolean" ? preferences.touch : TOUCH_DEVICE;
