@@ -6,6 +6,7 @@
     import { createCivilianConvoy } from "./convoy.ts";
     import { createRescueShip } from "./rescueShip.ts";
     import { createGuidedMissile, steerGuidedMissile } from "./guidedMissile.ts";
+    import { createParticlePool } from "./particlePool.ts";
     import fluffyPortrait from "./chancellor.webp";
     import perritoPortrait from "./general-perrito.webp";
     import { createLunarMine } from "./lunarMine.ts";
@@ -40,6 +41,8 @@
     $("effectsVolumeValue").textContent = `${settings.volume.value}%`;
     const bestScore = Number.isFinite(preferences.bestScore) ? Math.max(0, preferences.bestScore) : 0;
     let record = bestScore;
+    let recordDirty = false;
+    let lastRecordSave = performance.now();
     settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
     $("sensitivityValue").textContent = `${settings.sensitivity.value}%`;
     function savePreferences() {
@@ -52,8 +55,13 @@
           track: $("musicSelect").value.startsWith("blob:") ? "" : $("musicSelect").value,
           bestScore: record
         }));
+        recordDirty = false;
       } catch { /* Armazenamento indisponível: a partida continua. */ }
+      lastRecordSave = performance.now();
     }
+    window.addEventListener("beforeunload", () => {
+      if (recordDirty) savePreferences();
+    });
     for (const input of [settings.difficulty, settings.quality, settings.sensitivity, settings.effects, settings.volume]) {
       input.addEventListener("change", savePreferences);
     }
@@ -71,6 +79,9 @@
     const combatAudio = new CombatAudio(settings, () => camera);
     function wakeAudio() { combatAudio.wake(); }
     function sound(kind, position = null) { combatAudio.play(kind, position); }
+    settings.effects.addEventListener("change", () => {
+      if (settings.effects.checked) wakeAudio();
+    });
 
     const ui = {
       overlay: $("overlay"), title: $("title"), description: $("description"),
@@ -92,6 +103,10 @@
       warpValue: $("warpValue"), fuelValue: $("fuelValue"), bombValue: $("bombValue"),
       reticle: $("reticle"), target: $("target")
     };
+    settings.difficulty.addEventListener("change", () => {
+      if (started) ui.status.textContent =
+        "Dificuldade selecionada. Ela será aplicada ao reiniciar a missão.";
+    });
 
     const renderer = new THREE.WebGLRenderer({
       antialias: false,
@@ -1234,13 +1249,10 @@
     // PARTÍCULAS: POOL FIXO, SEM CRIAR MESHES EM CADA EXPLOSÃO
     // ============================================================
 
-    const particlePositions = new Float32Array(CONFIG.particles * 3);
-    const particleColors = new Float32Array(CONFIG.particles * 3);
-    const particleLives = new Float32Array(CONFIG.particles);
-    const particleMaxLives = new Float32Array(CONFIG.particles);
-    const particleVelocities = new Float32Array(CONFIG.particles * 3);
-    const particleBaseColors = new Float32Array(CONFIG.particles * 3);
-    let particleCursor = 0;
+    const particlePool = createParticlePool(CONFIG.particles);
+    const particlePositions = particlePool.positions;
+    const particleColors = particlePool.colors;
+    const particleLives = particlePool.lives;
 
     const particleGeo = new THREE.BufferGeometry();
     particleGeo.setAttribute("position",
@@ -1289,40 +1301,11 @@
     let visibleParticleCount = CONFIG.particles;
 
     function burst(position, hex, count = 70, force = 30) {
-      const color = new THREE.Color(hex).multiplyScalar(4);
-      const direction = new V3();
-
-      for (let i = 0; i < count; i++) {
-        const index = particleCursor++ % visibleParticleCount;
-        const k = index * 3;
-
-        position.toArray(particlePositions, k);
-        direction.randomDirection().multiplyScalar(rand(force * .15, force));
-        direction.toArray(particleVelocities, k);
-        color.toArray(particleBaseColors, k);
-        color.toArray(particleColors, k);
-
-        particleLives[index] = particleMaxLives[index] = rand(.3, 1.3);
-      }
+      particlePool.burst(position, hex, count, force, visibleParticleCount, rand);
     }
 
     function updateParticles(dt) {
-      const damping = Math.exp(-1.7 * dt);
-
-      for (let i = 0; i < CONFIG.particles; i++) {
-        if (particleLives[i] <= 0) continue;
-
-        particleLives[i] = Math.max(0, particleLives[i] - dt);
-        const k = i * 3;
-        const fade = particleLives[i] / particleMaxLives[i];
-
-        for (let axis = 0; axis < 3; axis++) {
-          particlePositions[k + axis] += particleVelocities[k + axis] * dt;
-          particleVelocities[k + axis] *= damping;
-          particleColors[k + axis] = particleBaseColors[k + axis] * fade;
-        }
-      }
-
+      particlePool.update(dt, visibleParticleCount);
       particleGeo.attributes.position.needsUpdate = true;
       particleGeo.attributes.color.needsUpdate = true;
       particleGeo.attributes.life.needsUpdate = true;
@@ -1552,7 +1535,9 @@
         maxHp: [3, 2, 7, 3][kind],
         hp: [3, 2, 7, 3][kind], phase: rand(0, Math.PI * 2),
         cooldown: rand(1.2, 3.8), respawn: 0,
-        velocity: new V3(), evade: new V3(), evadeTimer: 0, evadeCooldown: 0
+        velocity: new V3(), evade: new V3(), evadeTimer: 0, evadeCooldown: 0,
+        previous: new V3(), toward: new V3(), desired: new V3(),
+        lateral: new V3(), away: new V3(), miss: new V3()
       };
     }
 
@@ -3125,7 +3110,7 @@
         }
 
         musicStatus.textContent =
-          "Tocando a trilha padrão pelo player oficial do YouTube.";
+          "Player do YouTube aberto. Se a música não tocar, escolha um arquivo do dispositivo.";
         return;
       }
 
@@ -3176,8 +3161,8 @@
           : DEFAULT_YOUTUBE_PREVIEW;
         musicStatus.textContent =
           active
-            ? "Tocando a trilha padrão pelo player oficial do YouTube."
-            : "Trilha padrão do YouTube selecionada. Ela começará ao iniciar a missão.";
+            ? "Player do YouTube aberto. Se a música não tocar, escolha um arquivo do dispositivo."
+            : "Trilha do YouTube selecionada. Se estiver indisponível, escolha um arquivo do dispositivo.";
         return;
       }
 
@@ -3657,7 +3642,7 @@
       started = true;
       active = true;
       if (newMission) queueEvent("SENSORES // BATEDORES E NAVES SUPERSÔNICAS DETECTADOS", "alert");
-      if (settings.quality.value !== "low") requestPostprocessing();
+      if (effectiveQuality() !== "low") requestPostprocessing();
 
       ui.overlay.style.display = "none";
 
@@ -3675,8 +3660,9 @@
       if (score > record) {
         record = score;
         settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
-        savePreferences();
+        recordDirty = true;
       }
+      if (recordDirty) savePreferences();
       mouseDown = false;
 
       keys.clear();
@@ -3725,11 +3711,16 @@
     function reset() {
       restartPending = false;
       missionDifficulty = settings.difficulty.value;
+      autoReduced = false;
+      qualityWarmup = 3;
+      qualityWindow = qualityFrames = 0;
+      applyQuality();
       if (score > record) {
         record = score;
         settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
-        savePreferences();
+        recordDirty = true;
       }
+      if (recordDirty) savePreferences();
       clearTouchInput();
 
       score = 0;
@@ -3812,8 +3803,7 @@
       starterStation.supply = 70;
       starterStation.lastWarning = 100;
 
-      particleLives.fill(0);
-      particleColors.fill(0);
+      particlePool.clear();
       particleGeo.attributes.life.needsUpdate = true;
       particleGeo.attributes.color.needsUpdate = true;
 
@@ -4190,7 +4180,8 @@
         if (projection <= 0 || speedSq < 1) continue;
         const seconds = Math.min(.55, projection / speedSq);
         if (seconds < .04) continue;
-        const miss = bullet.mesh.position.clone().addScaledVector(bullet.velocity, seconds);
+        const miss = drone.miss.copy(bullet.mesh.position)
+          .addScaledVector(bullet.velocity, seconds);
         if (miss.distanceToSquared(position) < safeRadius * safeRadius) return bullet;
       }
       return null;
@@ -4205,7 +4196,7 @@
         }
 
         const p = drone.group.position;
-        const previous = p.clone();
+        const previous = drone.previous.copy(p);
         const distance = p.distanceTo(camera.position);
 
         if (distance > 950 && warpTimer === 0) {
@@ -4218,14 +4209,14 @@
             ally.group.position.distanceToSquared(p) < 480 ** 2)
           : null;
         const targetPosition = escortTarget?.group.position || camera.position;
-        const toward = new V3().subVectors(targetPosition, p);
+        const toward = drone.toward.subVectors(targetPosition, p);
         const targetDistance = toward.length();
         toward.normalize();
         const chaseSpeed = [38, 68, 23, 170][drone.kind];
         const approach = targetDistance > (drone.kind === 3 ? 155 : 115)
           ? chaseSpeed : targetDistance < 55 ? -chaseSpeed * .4 : 0;
-        const desired = toward.clone().multiplyScalar(approach);
-        const lateral = new V3().crossVectors(toward, UP_AXIS).normalize();
+        const desired = drone.desired.copy(toward).multiplyScalar(approach);
+        const lateral = drone.lateral.crossVectors(toward, UP_AXIS).normalize();
         desired.addScaledVector(lateral,
           Math.sin(time * (drone.kind === 3 ? 3.1 : 1.4) + drone.phase) *
           [17, 34, 9, 85][drone.kind]);
@@ -4238,7 +4229,7 @@
           if (threat) {
             drone.evade.crossVectors(threat.velocity, UP_AXIS).normalize();
             if (drone.evade.lengthSq() < .1) drone.evade.set(1, 0, 0);
-            const away = new V3().subVectors(p, threat.mesh.position);
+            const away = drone.away.subVectors(p, threat.mesh.position);
             if (drone.evade.dot(away) < 0) drone.evade.negate();
             drone.evade.y = Math.sin(drone.phase + time) * .32;
             drone.evade.normalize();
@@ -4640,13 +4631,15 @@
     const inverseQuaternion = new THREE.Quaternion();
     const radarVector = new V3();
     const projected = new V3();
+    let lastRadarUpdate = -Infinity;
 
     function updateHUD() {
       if (score > record) {
         record = score;
         settings.best.textContent = `RECORDE // ${String(record).padStart(6, "0")} PTS`;
-        savePreferences();
+        recordDirty = true;
       }
+      if (recordDirty && performance.now() - lastRecordSave >= 5000) savePreferences();
       ui.score.textContent = `${String(score).padStart(6, "0")} PTS`;
       ui.speed.textContent = `${String(Math.round(velocity.length())).padStart(3, "0")} M/S`;
       ui.sector.textContent = `SETOR ${currentSector.x}.${currentSector.y}.${currentSector.z} // ${thirdPerson ? "3ª PESSOA" : "COCKPIT"}`;
@@ -4685,6 +4678,14 @@
 
       ui.message.style.color = overheated || shield < 30 || fuel <= 8 ? "#ff668b" : "#63f7ff";
 
+      if (!active) ui.target.style.display = "none";
+      else if (time - lastRadarUpdate >= 1 / 30) {
+        lastRadarUpdate = time;
+        updateRadar(missileTarget);
+      }
+    }
+
+    function updateRadar(missileTarget) {
       radar.clearRect(0, 0, 240, 240);
 
       radar.fillStyle = "#021320b0";
@@ -4991,8 +4992,15 @@
       }
     }
 
+    let autoReduced = false;
+    let qualityWarmup = 3;
+    let qualityWindow = 0;
+    let qualityFrames = 0;
+    const effectiveQuality = () => settings.quality.value === "auto" && autoReduced
+      ? "low" : settings.quality.value;
+
     function applyQuality() {
-      const quality = settings.quality.value;
+      const quality = effectiveQuality();
       const ratio = quality === "low" ? .75 : quality === "high"
         ? Math.min(window.devicePixelRatio || 1, 1.5) : CONFIG.pixelRatio;
       renderer.setPixelRatio(ratio);
@@ -5002,7 +5010,10 @@
       if (active && quality !== "low") requestPostprocessing();
       starGeo.setDrawRange(0, quality === "low" ? Math.floor(CONFIG.stars * .4) : CONFIG.stars);
       visibleParticleCount = quality === "low" ? Math.max(100, Math.floor(CONFIG.particles * .4)) : CONFIG.particles;
+      if (quality === "low") particleLives.fill(0, visibleParticleCount);
       particleGeo.setDrawRange(0, visibleParticleCount);
+      particleGeo.attributes.life.needsUpdate = true;
+      particleMaterial.uniforms.dpr.value = ratio;
       cloudShell.visible = quality !== "low";
       stationDetails.visible = quality !== "low";
       for (const ally of allies) ally.beacon.visible = quality !== "low";
@@ -5012,7 +5023,33 @@
         }
       }
     }
-    settings.quality.addEventListener("change", applyQuality);
+    settings.quality.addEventListener("change", () => {
+      autoReduced = false;
+      qualityWarmup = 3;
+      qualityWindow = qualityFrames = 0;
+      applyQuality();
+    });
+
+    function monitorPerformance(elapsed) {
+      if (!active || settings.quality.value !== "auto" || autoReduced) return;
+      if (elapsed <= 0 || elapsed > .1) {
+        qualityWindow = qualityFrames = 0;
+        return;
+      }
+      if (qualityWarmup > 0) {
+        qualityWarmup -= elapsed;
+        return;
+      }
+      qualityWindow += elapsed;
+      qualityFrames++;
+      if (qualityWindow < 8) return;
+      if (qualityFrames / qualityWindow < 45) {
+        autoReduced = true;
+        applyQuality();
+        queueEvent("GRÁFICOS // QUALIDADE AUTOMÁTICA REDUZIDA PARA MANTER A FLUIDEZ");
+      }
+      qualityWindow = qualityFrames = 0;
+    }
 
     window.addEventListener("resize", () => {
       camera.aspect = innerWidth / innerHeight;
@@ -5045,10 +5082,12 @@
       requestAnimationFrame(frame);
 
       // Delta limitado para evitar saltos após travamentos ou troca de aba.
-      const dt = Math.min((now - lastTime) / 1000, .033);
+      const elapsed = (now - lastTime) / 1000;
+      const dt = Math.min(elapsed, .033);
       lastTime = now;
 
       pollGamepad();
+      monitorPerformance(elapsed);
 
       if (active) {
         time += dt;
@@ -5082,7 +5121,7 @@
 
       camera.updateMatrixWorld();
       updateHUD();
-      if (composer && settings.quality.value !== "low") composer.render(dt);
+      if (composer && effectiveQuality() !== "low") composer.render(dt);
       else renderer.render(scene, camera);
     }
 
