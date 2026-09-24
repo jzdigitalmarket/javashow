@@ -4,6 +4,9 @@
     import { upgradeShipVisuals, upgradeBossVisual } from "./shipModel.ts";
     import { createCapitalShip } from "./capitalShip.ts";
     import { createCivilianConvoy } from "./convoy.ts";
+    import { createRescueShip } from "./rescueShip.ts";
+    import fluffyPortrait from "./chancellor.webp";
+    import perritoPortrait from "./general-perrito.webp";
     import { createLunarMine } from "./lunarMine.ts";
     import { segmentDistanceSquared } from "./collision.ts";
     import { moveAgainstSolids } from "./solidCollision.ts";
@@ -73,6 +76,9 @@
       start: $("start"), status: $("status"), message: $("message"),
       eventFeed: $("eventFeed"), chancellorCall: $("chancellorCall"),
       chancellorText: $("chancellorText"),
+      chancellorPortrait: $("chancellorPortrait"),
+      chancellorSpeaker: $("chancellorSpeaker"),
+      chancellorChannel: $("chancellorChannel"),
       civTitle: $("civTitle"), civPopulation: $("civPopulation"),
       civGovernment: $("civGovernment"), civEconomy: $("civEconomy"),
       civTrade: $("civTrade"), civCulture: $("civCulture"),
@@ -1095,6 +1101,10 @@
         convoy.group.position.sub(shift);
         convoy.destination.sub(shift);
       }
+      if (rescueShip) {
+        rescueShip.group.position.sub(shift);
+        rescueShip.beam.position.sub(shift);
+      }
 
       for (let i = 0; i < CONFIG.particles; i++) {
         if (particleLives[i] <= 0) continue;
@@ -1746,6 +1756,91 @@
 
     let convoy = null;
     let nextConvoy = rand(35, 50);
+    let rescueShip = null;
+    let rescueCooldown = 0;
+    const rescueBeamGeo = new THREE.CylinderGeometry(.35, .35, 1, 8);
+    const rescueBeamMaterial = new THREE.MeshBasicMaterial({
+      color: 0x89f4d6, transparent: true, opacity: .68, depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    function clearRescueShip() {
+      if (!rescueShip) return;
+      scene.remove(rescueShip.group, rescueShip.beam);
+      rescueShip = null;
+    }
+
+    function requestRescueShip() {
+      const offsets = [[200, 48, -180], [-200, 55, -180],
+        [120, -65, 230], [-130, 90, 240]];
+      for (const [x, y, z] of offsets) {
+        const start = new V3(x, y, z).applyQuaternion(camera.quaternion)
+          .add(camera.position);
+        if (collectSolids(start, start, 14).some(solid =>
+          start.distanceToSquared(solid.center) < (solid.radius + 14) ** 2)) continue;
+        const group = createRescueShip();
+        const beam = new THREE.Mesh(rescueBeamGeo, rescueBeamMaterial);
+        beam.visible = false;
+        group.position.copy(start);
+        group.lookAt(camera.position);
+        scene.add(group, beam);
+        rescueShip = { group, beam, mode: "approach", age: 0,
+          dockedOnce: false, departure: 0 };
+        queueEvent("SOCORRO // NAVE TANQUE ACIONADA · MANTENHA A POSIÇÃO", "ally");
+        return;
+      }
+      rescueCooldown = 1;
+    }
+
+    function updateRescueShip(dt) {
+      rescueCooldown = Math.max(0, rescueCooldown - dt);
+      if (!rescueShip) {
+        if (fuel <= 0 && !refuelActive && rescueCooldown <= 0) requestRescueShip();
+        return;
+      }
+      const ship = rescueShip;
+      ship.age += dt;
+      if (ship.mode === "depart") {
+        ship.departure += dt;
+        ship.group.position.addScaledVector(
+          new V3(1, .35, -.8).applyQuaternion(camera.quaternion).normalize(), dt * 90);
+        if (ship.departure > 4) clearRescueShip();
+        return;
+      }
+      if (refuelActive || ship.age > 90) {
+        clearRescueShip();
+        rescueCooldown = refuelActive ? 0 : 2;
+        return;
+      }
+      const dock = new V3(16, 1, 0).applyQuaternion(camera.quaternion)
+        .add(camera.position);
+      const previous = ship.group.position.clone();
+      const distance = ship.group.position.distanceTo(dock);
+      if (distance > 3) ship.group.position.lerp(dock,
+        Math.min(1, dt * 105 / distance));
+      keepActorOutOfWorld(ship.group, previous, 13);
+      ship.group.lookAt(camera.position);
+      const inRange = ship.group.position.distanceToSquared(camera.position) < 27 ** 2;
+      ship.beam.visible = inRange;
+      if (!inRange) { ship.mode = "approach"; return; }
+      ship.mode = "transfer";
+      if (!ship.dockedOnce) {
+        ship.dockedOnce = true;
+        queueEvent("SOCORRO // NAVE TANQUE ACOPLADA · TRANSFERINDO COMBUSTÍVEL", "ally");
+        sound("shield");
+      }
+      const path = camera.position.clone().sub(ship.group.position);
+      ship.beam.position.copy(ship.group.position).addScaledVector(path, .5);
+      ship.beam.quaternion.setFromUnitVectors(UP_AXIS, path.clone().normalize());
+      ship.beam.scale.y = path.length();
+      fuel = Math.min(70, fuel + dt * 22);
+      if (fuel >= 70) {
+        ship.mode = "depart";
+        ship.beam.visible = false;
+        rescueCooldown = 30;
+        queueEvent("SOCORRO // TANQUE REPOSTO A 70% · NAVE DE APOIO RETORNANDO", "ally");
+      }
+    }
 
     function distributeLunarOre(tons, receivingStation) {
       const available = refuelStations.filter(entry => !entry.destroyed &&
@@ -2043,6 +2138,8 @@
         for (const ally of allies) {
           if (ally.active) add(ally.group.position, ally.radius, ally.group.uuid, "ally");
         }
+        if (rescueShip && rescueShip.mode !== "depart") add(
+          rescueShip.group.position, 10, "rescue-ship", "ally");
         if (boss.visible) add(boss.group.position, 19, "boss", "enemy");
         if (mothership.visible) {
           mothership.group.updateMatrixWorld(true);
@@ -2304,6 +2401,7 @@
     let eventTimer = 4, nextAmbientMessage = rand(5, 8);
     let nextChancellor = rand(18, 25), chancellorVisible = 0;
     let lastChancellorTopic = "";
+    let nextSpeaker = "fluffy";
 
     const ambientMessages = [
       "SENSORES // DESTROÇOS METÁLICOS À DERIVA",
@@ -2396,6 +2494,30 @@
       return selected.lines[Math.floor(Math.random() * selected.lines.length)];
     }
 
+    function generalReport() {
+      const reports = [
+        `Defesas de Aurora em nível ${defenseTier()}. A burocracia não consta no plano de batalha.`,
+        `Contamos ${drones.filter(drone => drone.group.visible).length} drones ativos. Minha paciência conta menos.`,
+        "Ordem do dia: proteger a colônia. Ordem do conselho: discutir a ordem do dia."
+      ];
+      if (fuel <= 15 || rescueShip) reports.push(
+        `Combustível em ${Math.ceil(fuel)}%. Acionei a nave tanque. Sim, desta vez antes do formulário.`,
+        "A nave de apoio está em missão. A próxima vez que sair sem combustível, leve uma coleira de reboque."
+      );
+      if (mothership.visible || boss.visible) reports.push(
+        "Contato pesado no setor. Minha estratégia oficial é atirar antes de escrever um relatório.",
+        "O inimigo quer negociar com lasers. Finalmente uma linguagem que eu entendo."
+      );
+      if (convoy) reports.push(
+        `O cargueiro leva ${Math.floor(convoy.tons)} toneladas. Dois escoltas e zero espaço para desculpas.`,
+        "Protejam a carga lunar. As estações não aceitam medalhas como combustível."
+      );
+      if (civilization.stability < 40) reports.push(
+        `Estabilidade em ${Math.round(civilization.stability)}%. Ordenei que os canhões mirassem para fora.`
+      );
+      return reports[Math.floor(Math.random() * reports.length)];
+    }
+
     function updateChancellor(dt) {
       if (chancellorVisible > 0) {
         chancellorVisible -= dt;
@@ -2406,11 +2528,19 @@
       }
       nextChancellor -= dt;
       if (nextChancellor > 0 || eventTimer > 1.5 || chancellorVisible > 0) return;
-      ui.chancellorText.textContent = chancellorReport();
+      const general = nextSpeaker === "perrito";
+      ui.chancellorCall.classList.toggle("general", general);
+      ui.chancellorSpeaker.textContent = general ? "GENERAL PERRITO // DEFESA" :
+        "MR. FLUFFY // CHANCELER";
+      ui.chancellorChannel.textContent = general ? "CANAL MILITAR ▪ AO VIVO" :
+        "CANAL DIPLOMÁTICO ▪ AO VIVO";
+      ui.chancellorPortrait.src = general ? perritoPortrait : fluffyPortrait;
       ui.chancellorCall.setAttribute("aria-hidden", "false");
+      ui.chancellorText.textContent = general ? generalReport() : chancellorReport();
       ui.chancellorCall.classList.add("visible");
       chancellorVisible = 8;
       nextChancellor = rand(48, 72);
+      nextSpeaker = general ? "fluffy" : "perrito";
     }
 
     const bullets = [];
@@ -3540,6 +3670,8 @@
       clearAlliedBeams();
       while (distantBattles.length) removeDistantBattle(distantBattles[0]);
       clearConvoy();
+      clearRescueShip();
+      rescueCooldown = 0;
       nextConvoy = rand(35, 50);
       nextDistantBattle = rand(8, 16);
       solidImpactTimes.clear();
@@ -3600,6 +3732,7 @@
       nextChancellor = rand(18, 25);
       chancellorVisible = 0;
       lastChancellorTopic = "";
+      nextSpeaker = "fluffy";
       ui.chancellorCall.classList.remove("visible");
       ui.chancellorCall.setAttribute("aria-hidden", "true");
       queueEvent("COMANDO // CANAL TÁTICO CONECTADO");
@@ -4429,6 +4562,8 @@
       ui.message.textContent =
         viewNoticeTimer > 0 ? (thirdPerson ? "VISÃO EXTERNA // 3ª PESSOA" : "VISÃO INTERNA // COCKPIT") :
         refuelActive ? `ESTAÇÃO // REABASTECENDO · RESERVA ${Math.ceil(nearbyStationSupply)}%` :
+        rescueShip?.mode === "transfer" ? `SOCORRO // REABASTECENDO · ${Math.ceil(fuel)}%` :
+        rescueShip?.mode === "approach" ? "SOCORRO // NAVE TANQUE EM APROXIMAÇÃO" :
         nearbyStationSupply !== null ? "ESTAÇÃO // RESERVA ESGOTADA · ESCOLTE MINÉRIO LUNAR" :
         warpTimer > 0 ? "HIPERVELOCIDADE // CAMPO ATIVO" :
         fuel <= 8 ? "ALERTA // COMBUSTÍVEL CRÍTICO" :
@@ -4618,6 +4753,17 @@
         radar.fillRect(118 + cx, 118 + cy, 4, 4);
       }
 
+      if (rescueShip) {
+        radarVector.subVectors(rescueShip.group.position, camera.position)
+          .applyQuaternion(inverseQuaternion);
+        let rx = radarVector.x * .42;
+        let ry = radarVector.z * .42;
+        const range = Math.hypot(rx, ry);
+        if (range > 105) { rx *= 105 / range; ry *= 105 / range; }
+        radar.fillStyle = "#8df4d6";
+        radar.fillRect(116 + rx, 116 + ry, 8, 8);
+      }
+
       for (const battle of distantBattles) {
         radarVector.subVectors(battle.group.position, camera.position)
           .applyQuaternion(inverseQuaternion);
@@ -4787,6 +4933,7 @@
 
         updatePlayer(dt);
         updateWorldObjects(dt);
+        updateRescueShip(dt);
         updateConvoy(dt);
         updateDrones(dt);
         updateAllies(dt);

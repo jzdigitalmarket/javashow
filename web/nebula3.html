@@ -268,6 +268,9 @@
       transform: translateX(0);
     }
 
+    #chancellorCall.general { border-color: #7fe5d799; }
+    #chancellorCall.general .chancellor-content strong { color: #9bf4db; }
+
     #chancellorCall::after {
       content: "";
       position: absolute;
@@ -1239,14 +1242,14 @@
       COMANDO // CANAL TÁTICO CONECTADO
     </div>
 
-    <aside id="chancellorCall" aria-label="Transmissão do chanceler" aria-live="polite" aria-hidden="true">
+    <aside id="chancellorCall" aria-label="Transmissão de Aurora" aria-live="polite" aria-hidden="true">
       <div class="chancellor-portrait">
-        <img src="../src/nebula3/chancellor.webp" alt="" width="92" height="104" decoding="async" />
+        <img id="chancellorPortrait" src="../src/nebula3/chancellor.webp" alt="" width="92" height="104" decoding="async" />
       </div>
       <div class="chancellor-content">
-        <strong>CHANCELER // AURORA</strong>
+        <strong id="chancellorSpeaker">MR. FLUFFY // CHANCELER</strong>
         <p id="chancellorText"></p>
-        <small>CANAL DIPLOMÁTICO ▪ AO VIVO</small>
+        <small id="chancellorChannel">CANAL DIPLOMÁTICO ▪ AO VIVO</small>
       </div>
     </aside>
 
