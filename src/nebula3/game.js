@@ -449,7 +449,8 @@
       mesh(ballGeo, moonRock, moon, [0, 0, 0], [radius, radius * .94, radius]);
       const equipment = createLunarMine(moon, radius);
       moons.push({ orbit, moon, radius, ...equipment,
-        phase: i * 2.7, ore: 1000, cargo: 0 });
+        phase: i * 2.7, ore: 1000, cargo: 0,
+        defenseCooldown: 1 + i * .3, defenseAnnounced: false });
     }
 
     // ============================================================
@@ -2091,6 +2092,24 @@
       planet.add(turret);
       defenseTurrets.push(turret);
     }
+    const moonDefenseTurrets = moons.map((moon, moonIndex) => {
+      const turrets = [];
+      for (let i = 0; i < 3; i++) {
+        const angle = i * Math.PI * 2 / 3 + moonIndex * .6;
+        const normal = new V3(Math.cos(angle), i === 1 ? .24 : -.16,
+          Math.sin(angle)).normalize();
+        const turret = new THREE.Group();
+        turret.position.copy(normal).multiplyScalar(moon.radius * .96 + 2);
+        turret.quaternion.setFromUnitVectors(UP_AXIS, normal);
+        mesh(new THREE.CylinderGeometry(4.5, 6, 3, 7), darkMetal, turret, [0, 0, 0]);
+        mesh(boxGeo, armor, turret, [0, 4, 0], [7, 4, 7]);
+        mesh(boxGeo, weaponAccent, turret, [0, 8, 0], [2.8, 8, 3]);
+        mesh(ballGeo, cyan, turret, [0, 13, 0], [2, 1.6, 2]);
+        moon.moon.add(turret);
+        turrets.push(turret);
+      }
+      return turrets;
+    });
     let defenseCooldown = 1.4;
     let defenseVolley = 0;
     let lastDefenseTier = 2;
@@ -2104,6 +2123,64 @@
     function clearDefenseBeam(beam) {
       scene.remove(beam.mesh);
       beam.mesh.material.dispose();
+    }
+
+    function fireDefenseBeam(origin, position, lunar = false) {
+      const path = position.clone().sub(origin);
+      const material = defenseBeamMaterial.clone();
+      if (lunar) material.color.setHex(0xffba72);
+      const beamMesh = new THREE.Mesh(defenseBeamGeo, material);
+      beamMesh.position.copy(origin).addScaledVector(path, .5);
+      beamMesh.quaternion.setFromUnitVectors(UP_AXIS, path.clone().normalize());
+      beamMesh.scale.set(lunar ? .6 : 1, path.length(), lunar ? .6 : 1);
+      scene.add(beamMesh);
+      defenseBeams.push({ mesh: beamMesh, life: .26 });
+    }
+
+    function acquireDefenseTarget(turrets, bodyCenter, range, muzzleHeight) {
+      let selected = null;
+      let best = Infinity;
+      const hostiles = drones.filter(drone => drone.group.visible)
+        .map(drone => ({ type: "drone", actor: drone, position: drone.group.position }));
+      if (boss.visible) hostiles.push({ type: "boss", actor: boss,
+        position: boss.group.position });
+      if (mothership.visible) hostiles.push({ type: "mothership", actor: mothership,
+        position: mothership.group.position });
+      for (const turret of turrets) {
+        const origin = turret.localToWorld(new V3(0, muzzleHeight, 0));
+        const normal = origin.clone().sub(bodyCenter).normalize();
+        for (const target of hostiles) {
+          const toTarget = target.position.clone().sub(origin);
+          const distance = toTarget.length();
+          if (distance > range || normal.dot(toTarget) < distance * .32) continue;
+          const priority = target.type === "mothership" ? .78 :
+            target.type === "boss" ? .86 : 1;
+          if (distance * priority >= best) continue;
+          best = distance * priority;
+          selected = { origin, target };
+        }
+      }
+      return selected;
+    }
+
+    function strikeDefenseTarget(target, tier, lunar) {
+      const position = target.position;
+      burst(position, lunar ? 0xffb86f : 0x6de8ff, lunar ? 9 : 17, 10);
+      if (target.type === "drone") {
+        const drone = target.actor;
+        drone.hp = Math.max(0, drone.hp - (lunar ? 8 : 10) * tier);
+        if (drone.hp <= 0) {
+          drone.group.visible = false;
+          drone.respawn = rand(3, 5.5);
+          burst(position, 0xff9d68, 48, 25);
+        }
+      } else if (target.type === "boss") {
+        boss.hp -= lunar ? tier * 2 : tier * 3;
+        if (boss.hp <= 0) destroyBoss();
+      } else {
+        mothership.hp -= lunar ? tier : tier + 1;
+        if (mothership.hp <= 0) destroyMothership();
+      }
     }
 
     function updatePlanetDefenses(dt) {
@@ -2129,38 +2206,34 @@
         lastDefenseTier = tier;
       }
 
-      if (tier === 0 || !mothership.visible ||
-        mothership.group.position.distanceToSquared(planet.position) > 2750 ** 2) return;
-      defenseCooldown -= dt;
-      if (defenseCooldown > 0) return;
+      if (tier === 0) return;
       planet.updateMatrixWorld(true);
-      const available = [];
-      for (const turret of defenseTurrets) {
-        const origin = turret.getWorldPosition(new V3());
-        const normal = origin.clone().sub(planet.position).normalize();
-        const direction = new V3().subVectors(mothership.group.position, origin).normalize();
-        if (normal.dot(direction) > .4) available.push(turret);
+      defenseCooldown -= dt;
+      if (defenseCooldown <= 0) {
+        const shot = acquireDefenseTarget(defenseTurrets, planet.position, 1600, 25);
+        if (shot) {
+          fireDefenseBeam(shot.origin, shot.target.position);
+          strikeDefenseTarget(shot.target, tier, false);
+          if (defenseVolley++ === 0) queueEvent(
+            "AURORA // BATERIAS PLANETÁRIAS INTERCEPTAM NAVES INIMIGAS", "ally");
+          defenseCooldown = tier === 1 ? 1.15 : tier === 2 ? .58 : .4;
+        } else defenseCooldown = .35;
       }
-      if (!available.length) { defenseCooldown = 1; return; }
-      const selected = available[defenseVolley % available.length];
-
-      const origin = selected.localToWorld(new V3(0, 25, 0));
-      const target = mothership.group.position.clone()
-        .add(new V3(rand(-28, 28), rand(-18, 18), rand(-28, 28)));
-      const path = target.sub(origin);
-      const beamMesh = new THREE.Mesh(defenseBeamGeo, defenseBeamMaterial.clone());
-      beamMesh.position.copy(origin).addScaledVector(path, .5);
-      beamMesh.quaternion.setFromUnitVectors(UP_AXIS, path.clone().normalize());
-      beamMesh.scale.set(1, path.length(), 1);
-      scene.add(beamMesh);
-      defenseBeams.push({ mesh: beamMesh, life: .26 });
-      burst(mothership.group.position, 0x6de8ff, 22, 14);
-      mothership.hp -= tier === 1 ? 2 : tier === 2 ? 3 : 4;
-      if (mothership.hp <= 0) destroyMothership();
-      if (defenseVolley++ === 0) {
-        queueEvent("AURORA // BATERIAS PLANETÁRIAS DISPARAM CONTRA A NAVE-MÃE", "ally");
-      }
-      defenseCooldown = tier === 1 ? 2.2 : tier === 2 ? 1.15 : .9;
+      moons.forEach((moon, index) => {
+        moon.defenseCooldown -= dt;
+        if (moon.defenseCooldown > 0) return;
+        const center = moon.moon.getWorldPosition(new V3());
+        const shot = acquireDefenseTarget(moonDefenseTurrets[index], center,
+          tier === 1 ? 450 : 780, 14);
+        if (!shot) { moon.defenseCooldown = .45; return; }
+        fireDefenseBeam(shot.origin, shot.target.position, true);
+        strikeDefenseTarget(shot.target, tier, true);
+        if (!moon.defenseAnnounced) {
+          queueEvent(`LUA ${index + 1} // CANHÕES PROTEGEM A OPERAÇÃO DE MINERAÇÃO`, "ally");
+          moon.defenseAnnounced = true;
+        }
+        moon.defenseCooldown = tier === 1 ? 2.4 : tier === 2 ? 1.65 : 1.25;
+      });
     }
 
     // ============================================================
@@ -3420,6 +3493,8 @@
         moon.orbit.rotation.y = [.4, 2.5, 4.3][index];
         moon.ore = 1000;
         moon.cargo = 0;
+        moon.defenseCooldown = 1 + index * .3;
+        moon.defenseAnnounced = false;
       });
       miningReadyNotified = false;
       atmosphere.position.copy(planet.position);
