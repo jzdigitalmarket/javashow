@@ -15,7 +15,7 @@ export const CONFIG = {
   drones: 12,
   allies: 10,
   bossHp: 42,
-  mothershipHp: 260,
+  mothershipHp: 338,
   cruiseSpeed: 48,
   boostSpeed: 145,
   warpSpeed: 620

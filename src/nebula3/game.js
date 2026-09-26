@@ -1852,6 +1852,7 @@
         cooldown: 1,
         barrageCooldown: 4.5,
         respawn: rand(68, 88),
+        arrivalWarned: false,
         salvo: 0,
         phase: rand(0, Math.PI * 2)
       };
@@ -2607,7 +2608,7 @@
       ).length;
 
       const contextual = mothership.visible
-        ? `ALERTA // NAVE-MÃE COM ${Math.ceil(mothership.hp / CONFIG.mothershipHp * 100)}% DE INTEGRIDADE`
+        ? `ALERTA // NAVE-MÃE COM ${Math.ceil(mothership.hp / Math.round(CONFIG.mothershipHp * difficultyScale()) * 100)}% DE INTEGRIDADE`
         : boss.visible
         ? `ALERTA // CHEFÃO COM ${Math.ceil(boss.hp / CONFIG.bossHp * 100)}% DE INTEGRIDADE`
         : nearbyEnemies >= 5
@@ -4087,6 +4088,7 @@
       mothership.group.visible = false;
       mothership.hp = Math.round(CONFIG.mothershipHp * difficultyScale());
       mothership.respawn = rand(65, 82) / difficultyScale();
+      mothership.arrivalWarned = false;
       resetCivilization();
       eventTimer = 4;
       nextAmbientMessage = rand(5, 8);
@@ -4809,7 +4811,7 @@
       mothership.barrageCooldown = 4.2;
       mothership.salvo = 0;
       defenseVolley = 0;
-      queueEvent("ALERTA VERMELHO // NAVE-MÃE INIMIGA EM APROXIMAÇÃO", "alert");
+      queueEvent("ALERTA VERMELHO // NAVE-MÃE INIMIGA ENTROU NO SETOR", "alert");
     }
 
     function destroyMothership() {
@@ -4821,6 +4823,7 @@
       mothership.visible = false;
       mothership.group.visible = false;
       mothership.respawn = rand(240, 320) / difficultyScale();
+      mothership.arrivalWarned = false;
       score += 8000;
       affectCivilization({ stability: 12, economy: 4, trade: 5 }, "AURORA // NAVE-MÃE DESTRUÍDA · ROTAS COMERCIAIS REABERTAS");
       sound("bomb", mothership.group.position);
@@ -4830,6 +4833,10 @@
     function updateMothership(dt) {
       if (!mothership.visible) {
         mothership.respawn -= dt;
+        if (!mothership.arrivalWarned && mothership.respawn <= 10) {
+          mothership.arrivalWarned = true;
+          queueEvent("ALERTA VERMELHO // NAVE-MÃE DETECTADA · CHEGADA EM 10 SEGUNDOS", "alert");
+        }
         if (mothership.respawn <= 0) spawnMothership();
         return;
       }
