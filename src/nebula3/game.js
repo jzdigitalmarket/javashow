@@ -421,7 +421,7 @@
           void main() {
             vec3 view = normalize(cameraPosition - vWorld);
             float rim = pow(1. - abs(dot(normalize(vNormal), view)), 3.);
-            gl_FragColor = vec4(.08, .48, 1., rim * .325);
+            gl_FragColor = vec4(.08, .48, 1., rim * .065);
           }
         `
       })
