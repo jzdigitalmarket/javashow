@@ -1765,7 +1765,9 @@
         maxHp: [28, 65, 150][tier],
         respawn: 0,
         phase: rand(0, Math.PI * 2),
-        velocity: new V3()
+        velocity: new V3(),
+        curve: new V3(),
+        facing: new THREE.Group()
       };
     }
 
@@ -4662,6 +4664,10 @@
           : boss.visible ? boss.group.position
           : droneTarget?.group.position;
         const attackTarget = targetPosition;
+        const curvePhase = time * .85 + ally.phase;
+        ally.curve.set(Math.sin(curvePhase) * 27,
+          Math.cos(curvePhase * .8) * 10, Math.cos(curvePhase) * 27)
+          .applyQuaternion(camera.quaternion);
 
         if (!siegeActive && ally.group.position.distanceToSquared(camera.position) > 700 * 700) {
           targetPosition = null;
@@ -4677,7 +4683,8 @@
           if (siegeActive) escort.add(planet.position);
           else escort.applyQuaternion(camera.quaternion).add(camera.position);
           temp.subVectors(escort, ally.group.position);
-          ally.velocity.lerp(temp.clampLength(0, 230), 1 - Math.exp(-2.4 * dt));
+          temp.clampLength(0, 160).addScaledVector(ally.curve, .7);
+          ally.velocity.lerp(temp, 1 - Math.exp(-2.2 * dt));
         } else {
           const offset = new V3(
             (ally.index % 5 - 2) * 68,
@@ -4687,12 +4694,10 @@
           targetPosition = targetPosition.clone().add(offset);
           temp.subVectors(targetPosition, ally.group.position);
           const distance = temp.length();
-          const desiredSpeed = distance > (ally.tier === 2 ? 280 : 190)
-            ? (ally.tier === 2 ? 68 : 95) : distance < 95 ? -34 : 18;
-          temp.normalize().multiplyScalar(desiredSpeed);
-          temp.x += Math.sin(time * 1.7 + ally.phase) * 18;
-          ally.velocity.lerp(temp, 1 - Math.exp(-2.8 * dt));
-          ally.group.lookAt(attackTarget);
+          const desiredSpeed = clamp((distance - 125) * .48,
+            -35, ally.tier === 2 ? 110 : 150);
+          temp.normalize().multiplyScalar(desiredSpeed).add(ally.curve);
+          ally.velocity.lerp(temp, 1 - Math.exp(-2.3 * dt));
 
           ally.cooldown -= dt;
           if (ally.cooldown <= 0 && distance < (ally.tier === 2 ? 620 : 390)) {
@@ -4721,6 +4726,11 @@
         }
         ally.group.position.addScaledVector(ally.velocity, dt);
         keepActorOutOfWorld(ally.group, previous, ally.radius);
+        if (ally.velocity.lengthSq() > 64) {
+          ally.facing.position.copy(ally.group.position);
+          ally.facing.lookAt(temp.copy(ally.group.position).add(ally.velocity));
+          ally.group.quaternion.slerp(ally.facing.quaternion, 1 - Math.exp(-4 * dt));
+        }
         ally.group.rotation.z = Math.sin(time * 2.2 + ally.phase) * .08;
       }
     }
