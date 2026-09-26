@@ -421,7 +421,7 @@
           void main() {
             vec3 view = normalize(cameraPosition - vWorld);
             float rim = pow(1. - abs(dot(normalize(vNormal), view)), 3.);
-            gl_FragColor = vec4(.08, .48, 1., rim * .65);
+            gl_FragColor = vec4(.08, .48, 1., rim * .325);
           }
         `
       })
@@ -1223,6 +1223,8 @@
     // ============================================================
 
     const streakCount = 420;
+    const turboStreakCount = 180;
+    let turboStreaks = false;
     const streakData = [];
     const streakPositions = new Float32Array(streakCount * 6);
     const streakGeo = new THREE.BufferGeometry();
@@ -4224,6 +4226,7 @@
         inputDown("ShiftLeft") ||
         inputDown("ShiftRight") ||
         gamepadInput.boost;
+      turboStreaks = boosting && warpTimer <= 0;
 
       const descending =
         inputDown("ControlLeft") ||
@@ -5260,6 +5263,7 @@
 
       const speedFactor = clamp(velocity.length() / CONFIG.boostSpeed, 0, 1);
       streakMaterial.opacity = speedFactor * .15 + warpVisual * .65;
+      streakGeo.setDrawRange(0, (turboStreaks ? turboStreakCount : streakCount) * 2);
 
       for (let i = 0; i < streakCount; i++) {
         const s = streakData[i];
