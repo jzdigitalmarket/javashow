@@ -3,6 +3,7 @@
     import { CombatAudio } from "./combatAudio.ts";
     import { upgradeShipVisuals, upgradeBossVisual } from "./shipModel.ts";
     import { createCapitalShip } from "./capitalShip.ts";
+    import { upgradeCapitalShipVisuals, setCapitalShipDetail } from "./capitalShipModel.ts";
     import { createCivilianConvoy } from "./convoy.ts";
     import { createRescueShip } from "./rescueShip.ts";
     import { createGuidedMissile, steerGuidedMissile } from "./guidedMissile.ts";
@@ -1839,11 +1840,11 @@
     // ============================================================
 
     function createMothership() {
-      const { group, core, commandRing, turrets } = createCapitalShip();
+      const { group, core, commandRing, turrets, legacyHull } = createCapitalShip();
       group.visible = false;
       scene.add(group);
       return {
-        group, core, commandRing, turrets,
+        group, core, commandRing, turrets, legacyHull,
         visible: false,
         hp: CONFIG.mothershipHp,
         cooldown: 1,
@@ -1855,6 +1856,14 @@
     }
 
     const mothership = createMothership();
+    let mothershipVisualRequested = false;
+
+    function requestMothershipVisual() {
+      if (mothershipVisualRequested || effectiveQuality() === "low") return;
+      mothershipVisualRequested = true;
+      void upgradeCapitalShipVisuals(mothership).then(() =>
+        setCapitalShipDetail(mothership, effectiveQuality() !== "low"));
+    }
 
     // Multiple hit zones follow the bow, main hull and engine nacelles.
     const mothershipHitZones = [
@@ -4785,6 +4794,7 @@
     }
 
     function spawnMothership() {
+      requestMothershipVisual();
       const local = new V3(rand(-130, 130), rand(80, 150), -rand(620, 760))
         .applyQuaternion(camera.quaternion)
         .add(camera.position);
@@ -5288,6 +5298,8 @@
 
     function applyQuality() {
       const quality = effectiveQuality();
+      setCapitalShipDetail(mothership, quality !== "low");
+      if (quality !== "low" && mothership.visible) requestMothershipVisual();
       const ratio = quality === "low" ? .75 : quality === "high"
         ? Math.min(window.devicePixelRatio || 1, 1.5) : CONFIG.pixelRatio;
       renderer.setPixelRatio(ratio);

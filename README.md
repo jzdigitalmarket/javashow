@@ -77,4 +77,6 @@ Edite `web/nebula3.html` e os módulos em `src/nebula3/`. O build gera `nebula3.
 | `audio/` | Efeitos sonoros locais |
 | `scripts/publish-nebula3.mjs` | Copia o resultado do Vite para os arquivos de publicação na raiz |
 
-Para recriar os modelos GLB, execute `python scripts/generate-nebula-model.py`. A migração para TypeScript é incremental: `npm run check` verifica os módulos TypeScript, enquanto a lógica central ainda está em JavaScript.
+Para recriar os modelos da nave do jogador e da nave-chefã, execute `python scripts/generate-nebula-model.py`. Para recriar o casco detalhado da nave-mãe, execute `python scripts/generate-mothership-model.py`. O casco é carregado apenas na primeira aparição da nave-mãe, em qualidade Automática ou Alta; a geometria anterior permanece como reserva e no modo Econômica. Suas torretas, áreas de colisão e partes animadas continuam sob controle do jogo.
+
+A migração para TypeScript é incremental: `npm run check` verifica os módulos TypeScript, enquanto a lógica central ainda está em JavaScript.

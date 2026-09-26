@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 
-type CapitalShip = {
+export type CapitalShip = {
   group: THREE.Group;
   core: THREE.Mesh;
   commandRing: THREE.Mesh;
   turrets: THREE.Group[];
+  legacyHull: THREE.Object3D[];
+  detailModel?: THREE.Group;
 };
 
 // The long armored hull is made from octagonal cross sections. It retains a
@@ -61,6 +63,7 @@ function wingGeometry(side: number): THREE.BufferGeometry {
 export function createCapitalShip(): CapitalShip {
   const group = new THREE.Group();
   group.scale.setScalar(8);
+  const legacyHull: THREE.Object3D[] = [];
 
   const hull = new THREE.MeshStandardMaterial({
     color: 0x667582, metalness: .74, roughness: .48, side: THREE.DoubleSide,
@@ -94,6 +97,7 @@ export function createCapitalShip(): CapitalShip {
     mesh.position.set(...position);
     mesh.scale.set(...scale);
     parent.add(mesh);
+    if (parent === group) legacyHull.push(mesh);
     return mesh;
   }
 
@@ -165,6 +169,7 @@ export function createCapitalShip(): CapitalShip {
   }
   panels.instanceMatrix.needsUpdate = true;
   group.add(panels);
+  legacyHull.push(panels);
 
   const turrets: THREE.Group[] = [];
   for (const side of [-1, 1]) {
@@ -186,5 +191,9 @@ export function createCapitalShip(): CapitalShip {
     group, [0, 7.85, -6.6]);
   commandRing.rotation.x = Math.PI / 2;
 
-  return { group, core, commandRing, turrets };
+  // These moving parts stay in place when the static hull is upgraded to GLB.
+  legacyHull.splice(legacyHull.indexOf(core), 1);
+  legacyHull.splice(legacyHull.indexOf(commandRing), 1);
+
+  return { group, core, commandRing, turrets, legacyHull };
 }
