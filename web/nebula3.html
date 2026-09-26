@@ -865,10 +865,20 @@
     /* Briefing orbital: mantém a missão e os ajustes legíveis em telas pequenas. */
     #overlay {
       background:
-        radial-gradient(circle at 18% 20%, #12345a88, transparent 38%),
-        radial-gradient(circle at 86% 82%, #3c1b5680, transparent 42%),
-        linear-gradient(135deg, #030914f5, #01030bed);
+        radial-gradient(circle at 18% 20%, #124d3955, transparent 38%),
+        radial-gradient(circle at 86% 82%, #17503b44, transparent 42%),
+        linear-gradient(135deg, #010a09f5, #010407f5);
       isolation: isolate;
+    }
+
+    #matrixRain {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+      opacity: .54;
     }
 
     #overlay::before {
@@ -888,6 +898,8 @@
     }
 
     #overlay .panel {
+      position: relative;
+      z-index: 1;
       width: min(1100px, 100%);
       height: min(820px, calc(100dvh - 32px));
       max-height: none;
@@ -1361,6 +1373,7 @@
   </div>
 
   <div id="overlay">
+    <canvas id="matrixRain" aria-hidden="true"></canvas>
     <div class="panel" role="dialog" aria-label="Painel da missão Nebula 3">
       <div class="briefing-top">
         <div class="eyebrow"><span class="signal-dot"></span> NEXUS / 07 <span class="top-divider">//</span> COMANDO ORBITAL</div>
@@ -1581,6 +1594,49 @@
   </div>
 
   <script>
+    (() => {
+      const canvas = document.getElementById("matrixRain");
+      const overlay = document.getElementById("overlay");
+      const ctx = canvas.getContext("2d", { alpha: true });
+      if (!ctx) return;
+
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const glyphs = "01アイウエオカキクケコサシスセソ";
+      const spacing = 26;
+      let drops = [];
+      let lastFrame = 0;
+
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        drops = Array.from({ length: Math.ceil(canvas.width / spacing) },
+          () => Math.random() * canvas.height / spacing);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        lastFrame = 0;
+      }
+
+      function frame(now) {
+        requestAnimationFrame(frame);
+        if (document.hidden || overlay.style.display === "none" ||
+            (reducedMotion.matches && lastFrame) || now - lastFrame < 50) return;
+        lastFrame = now;
+        ctx.fillStyle = "rgba(1, 7, 6, 0.19)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = "15px monospace";
+        for (let column = 0; column < drops.length; column++) {
+          const y = drops[column] * spacing;
+          ctx.fillStyle = Math.random() > .92 ? "#c9ffe0" : "#29bd70";
+          ctx.fillText(glyphs[Math.floor(Math.random() * glyphs.length)], column * spacing, y);
+          if (y > canvas.height && Math.random() > .975) drops[column] = 0;
+          else drops[column] += reducedMotion.matches ? 0 : .38 + (column % 4) * .09;
+        }
+      }
+
+      window.addEventListener("resize", resize, { passive: true });
+      resize();
+      requestAnimationFrame(frame);
+    })();
+
     window.spaceReady = false;
 
     window.addEventListener("error", () => {
